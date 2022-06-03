@@ -1,0 +1,35 @@
+augment3d:
+  scale: [1.0, 1.0]
+  rotate: [0.0, 0.0]
+  translate: 0
+
+model:
+  encoders:
+    lidar: null
+    camera:
+      vtransform:
+        type: LSSTransform
+        image_size: ${image_size}
+        xbound: [-51.2, 51.2, 0.8]
+        ybound: [-51.2, 51.2, 0.8]
+        zbound: [-10.0, 10.0, 20.0]
+        dbound: [1.0, 60.0, 1.0]
+  heads:
+    object:
+      test_cfg:
+        nms_type:
+          - circle
+          - rotate
+          - rotate
+          - circle
+          - rotate
+          - rotate
+        nms_scale:
+          - [1.0]
+          - [1.0, 1.0]
+          - [1.0, 1.0]
+          - [1.0]
+          - [1.0, 1.0]
+          - [2.5, 4.0]
+
+lr_config: null

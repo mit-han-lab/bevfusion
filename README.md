@@ -8,7 +8,8 @@
 
 **If you are interested in getting updates, please sign up [here](https://docs.google.com/forms/d/e/1FAIpQLSfkmfsX45HstL5rUQlS7xJthhS3Z_Pm2NOVstlXUqgaK4DEfQ/viewform) to get notified!**
 
-- **(2022/5/28)** We will be releasing the first version of BEVFusion next week. Stay tuned!
+- **(2022/6/3)** We released the first version of BEVFusion (with pre-trained checkpoints and evaluation).
+- **(2022/5/26)** BEVFusion is released on arXiv.
 
 ## Abstract
 
@@ -18,25 +19,113 @@ Multi-sensor fusion is essential for an accurate and reliable autonomous driving
 
 ### 3D Object Detection on nuScenes test
 
-|   Model   | Modality | mAP  | NDS  | Checkpoint  |
-| :-------: | :------: | :--: | :--: | :---------: |
-| BEVFusion |   C+L    | 70.2 | 72.9 | Coming Soon |
+|   Model   | Modality | mAP  | NDS  |
+| :-------: | :------: | :--: | :--: |
+| [BEVFusion](configs/nuscenes/det/transfusion/secfpn/camera+lidar/swint_v0p075/convfuser.yaml) |   C+L    | 70.23 | 72.88 |
 
 ### 3D Object Detection on nuScenes validation
 
 |        Model         | Modality | mAP  | NDS  | Checkpoint  |
 | :------------------: | :------: | :--: | :--: | :---------: |
-|      BEVFusion       |   C+L    | 68.5 | 71.4 | Coming Soon |
-| Camera-Only Baseline |    C     | 33.3 | 40.2 | Coming Soon |
-| LiDAR-Only Baseline  |    L     | 64.8 | 69.3 | Coming Soon |
+|    [BEVFusion](configs/nuscenes/det/transfusion/secfpn/camera+lidar/swint_v0p075/convfuser.yaml)       |   C+L    | 68.39 | 71.32 | [Link](https://bevfusion.mit.edu/files/pretrained/bevfusion-det.pth) |
+| [Camera-Only Baseline](configs/nuscenes/det/centerhead/lssfpn/camera/256x704/swint/default.yaml) |    C     | 33.25 | 40.15 | [Link](https://bevfusion.mit.edu/files/pretrained/camera-only-det.pth) |
+| [LiDAR-Only Baseline](configs/nuscenes/det/transfusion/secfpn/lidar/voxelnet_0p075.yaml)  |    L     | 64.68 | 69.28 | [Link](https://bevfusion.mit.edu/files/pretrained/lidar-only-det.pth) |
+
+*Note*: The camera-only object detection baseline is a variant of BEVDet-Tiny with a much heavier view transformer and other differences in hyperparameters. Thanks to our [efficient BEV pooling](mmdet3d/ops/bev_pool) operator, this model runs fast and has higher mAP than BEVDet-Tiny under the same input resolution. Please refer to [BEVDet repo](https://github.com/HuangJunjie2017/BEVDet) for the original BEVDet-Tiny implementation. The LiDAR-only baseline is TransFusion-L.
 
 ### BEV Map Segmentation on nuScenes validation
 
 |        Model         | Modality | mIoU | Checkpoint  |
 | :------------------: | :------: | :--: | :---------: |
-|      BEVFusion       |   C+L    | 62.7 | Coming Soon |
-| Camera-Only Baseline |    C     | 56.6 | Coming Soon |
-| LiDAR-Only Baseline  |    L     | 48.6 | Coming Soon |
+| [BEVFusion](configs/nuscenes/seg/fusion-bev256d2-lss.yaml)       |   C+L    | 62.69 | [Link](https://bevfusion.mit.edu/files/pretrained/bevfusion-seg.pth) |
+| [Camera-Only Baseline](configs/nuscenes/seg/lidar-centerpoint-bev128.yaml) |    C     | 56.56 | [Link](https://bevfusion.mit.edu/files/pretrained/camera-only-seg.pth) |
+| [LiDAR-Only Baseline](configs/nuscenes/seg/camera-bev256d2.yaml)  |    L     | 48.56 | [Link](https://bevfusion.mit.edu/files/pretrained/lidar-only-seg.pth) |
+
+## Usage
+
+### Prerequisites
+
+The code is built with following libraries:
+
+- Python >= 3.8, \<3.9
+- [PyTorch](https://github.com/pytorch/pytorch) >= 1.9
+- [tqdm](https://github.com/tqdm/tqdm)
+- [torchpack](https://github.com/mit-han-lab/torchpack)
+- [mmcv](https://github.com/open-mmlab/mmcv) = 1.4.0
+- [mmdetection](http://github.com/open-mmlab/mmdetection) = 2.20.0
+
+After installing these dependencies, please run this command to install the codebase:
+
+```bash
+python setup.py develop
+```
+
+### Data Preparation
+
+#### nuScenes
+
+Please follow the instructions from [here](https://github.com/open-mmlab/mmdetection3d/blob/master/docs/en/datasets/nuscenes_det.md) to download and preprocess the nuScenes dataset. Please remember to download both detection dataset and the map extension (for BEV map segmentation). After data preparation, you will be able to see the following directory structure (as is indicated in mmdetection3d):
+
+```
+mmdetection3d
+├── mmdet3d
+├── tools
+├── configs
+├── data
+│   ├── nuscenes
+│   │   ├── maps
+│   │   ├── samples
+│   │   ├── sweeps
+│   │   ├── v1.0-test
+|   |   ├── v1.0-trainval
+│   │   ├── nuscenes_database
+│   │   ├── nuscenes_infos_train.pkl
+│   │   ├── nuscenes_infos_val.pkl
+│   │   ├── nuscenes_infos_test.pkl
+│   │   ├── nuscenes_dbinfos_train.pkl
+│   │   ├── nuscenes_infos_train_mono3d.coco.json
+│   │   ├── nuscenes_infos_val_mono3d.coco.json
+│   │   ├── nuscenes_infos_test_mono3d.coco.json
+```
+
+### Evaluation
+
+We also provide instructions for evaluating our pretrained models. Please download the checkpoints using the following script: 
+
+```bash
+./tools/download_pretrained.sh
+```
+
+Then, you will be able to run:
+
+```bash
+torchpack dist-run -np 8 python tools/test.py [config file path] pretrained/[checkpoint name].pth --eval [evaluation type]
+```
+
+For example, if you want to evaluate the detection variant of BEVFusion, you can try:
+
+```bash
+torchpack dist-run -np 8 python tools/test.py configs/nuscenes/det/transfusion/secfpn/camera+lidar/swint_v0p075/convfuser.yaml pretrained/bevfusion-det.pth --eval bbox
+```
+
+While for the segmentation variant of BEVFusion, this command will be helpful:
+
+```bash
+torchpack dist-run -np 8 python tools/test.py configs/nuscenes/seg/fusion-bev256d2-lss.yaml pretrained/bevfusion-seg.pth --eval map
+```
+
+## FAQs
+
+Q: Can we directly use the info files prepared by mmdetection3d?
+
+A: We recommend re-generating the info files using this codebase since we forked mmdetection3d before their [coordinate system refactoring](https://github.com/open-mmlab/mmdetection3d/blob/master/docs/en/changelog.md).
+
+## Acknowledgements
+
+BEVFusion is based on [mmdetection3d](https://github.com/open-mmlab/mmdetection3d). It is also greatly inspired by the following outstanding contributions to the open-source community: [LSS](https://github.com/nv-tlabs/lift-splat-shoot), [BEVDet](https://github.com/HuangJunjie2017/BEVDet), [TransFusion](https://github.com/XuyangBai/TransFusion), [CenterPoint](https://github.com/tianweiy/CenterPoint), [MVP](https://github.com/tianweiy/MVP), [FUTR3D](https://arxiv.org/abs/2203.10642), [CVT](https://github.com/bradyz/cross_view_transformers) and [DETR3D](https://github.com/WangYueFt/detr3d). 
+
+Please also check out related papers in the camera-only 3D perception community such as [BEVDet4D](https://arxiv.org/abs/2203.17054), [BEVerse](https://arxiv.org/abs/2205.09743), [BEVFormer](https://arxiv.org/abs/2203.17270), [M2BEV](https://arxiv.org/abs/2204.05088) and [PETR](https://arxiv.org/abs/2203.05625), which might be interesting future extensions to BEVFusion.
+
 
 ## Citation
 

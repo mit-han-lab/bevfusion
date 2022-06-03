@@ -1,0 +1,23 @@
+model:
+  decoder:
+    backbone:
+      type: GeneralizedResNet
+      in_channels: 336
+      blocks:
+        - [2, 160, 2]
+        - [2, 320, 2]
+        - [2, 640, 1]
+    neck:
+      type: LSSFPN
+      in_indices: [-1, 0]
+      in_channels: [640, 160]
+      out_channels: 256
+      scale_factor: 2
+  heads:
+    object:
+      in_channels: 256
+
+optimizer:
+  type: AdamW
+  lr: 2.0e-4
+  weight_decay: 0.01

@@ -1,0 +1,6 @@
+model:
+  type: BEVFusion
+  encoders: null
+  fuser: null
+  heads:
+    map: null

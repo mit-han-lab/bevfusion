@@ -1,0 +1,48 @@
+voxel_size: [0.2, 0.2, 8]
+
+model:
+  encoders:
+    lidar:
+      voxelize_reduce: false
+      voxelize:
+        max_num_points: 20
+        point_cloud_range: ${point_cloud_range}
+        voxel_size: ${voxel_size}
+        max_voxels: [30000, 60000]
+      backbone:
+        type: PointPillarsEncoder
+        pts_voxel_encoder:
+          type: PillarFeatureNet
+          in_channels: 5
+          feat_channels: [64, 64]
+          with_distance: false
+          point_cloud_range: ${point_cloud_range}
+          voxel_size: ${voxel_size}
+          norm_cfg:
+            type: BN1d
+            eps: 1.0e-3
+            momentum: 0.01
+        pts_middle_encoder:
+          type: PointPillarsScatter
+          in_channels: 64
+          output_shape: [512, 512]
+  decoder:
+    backbone:
+      in_channels: 64
+      out_channels: [64, 128, 256]
+      layer_nums: [3, 5, 5]
+      layer_strides: [2, 2, 2]
+    neck:
+      in_channels: [64, 128, 256]
+      out_channels: [128, 128, 128]
+      upsample_strides: [0.5, 1, 2]
+  heads:
+    object:
+      in_channels: 384
+      train_cfg:
+        grid_size: [512, 512, 1]
+        out_size_factor: 4
+      test_cfg:
+        out_size_factor: 4
+      bbox_coder:
+        out_size_factor: 4

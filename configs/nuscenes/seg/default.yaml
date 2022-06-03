@@ -1,0 +1,13 @@
+model:
+  type: BEVFusion
+
+  heads:
+    object: null
+    map:
+      type: BEVSegmentationHead
+      in_channels: 256
+      grid_transform:
+        input_scope: [[-51.2, 51.2, 0.8], [-51.2, 51.2, 0.8]]
+        output_scope: [[-50, 50, 0.5], [-50, 50, 0.5]]
+      classes: ${map_classes}
+      loss: focal
