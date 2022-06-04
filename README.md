@@ -8,8 +8,10 @@
 
 **If you are interested in getting updates, please sign up [here](https://docs.google.com/forms/d/e/1FAIpQLSfkmfsX45HstL5rUQlS7xJthhS3Z_Pm2NOVstlXUqgaK4DEfQ/viewform) to get notified!**
 
+- **(2022/6/3)** BEVFusion ranks first on [nuScenes](https://nuscenes.org/object-detection?externalData=all&mapData=all&modalities=Any) among all solutions.
 - **(2022/6/3)** We released the first version of BEVFusion (with pre-trained checkpoints and evaluation).
-- **(2022/5/26)** BEVFusion is released on arXiv.
+- **(2022/5/26)** BEVFusion is released on [arXiv](https://arxiv.org/abs/2205.13542).
+- **(2022/5/2)** BEVFusion ranks first on [nuScenes](https://nuscenes.org/object-detection?externalData=all&mapData=all&modalities=Any) among all solutions that do not use test-time augmentation and model ensemble.
 
 ## Abstract
 
@@ -17,13 +19,14 @@ Multi-sensor fusion is essential for an accurate and reliable autonomous driving
 
 ## Results
 
-### 3D Object Detection on nuScenes test
+### 3D Object Detection (on nuScenes test)
 
 |   Model   | Modality | mAP  | NDS  |
 | :-------: | :------: | :--: | :--: |
-| [BEVFusion](configs/nuscenes/det/transfusion/secfpn/camera+lidar/swint_v0p075/convfuser.yaml) |   C+L    | 70.23 | 72.88 |
+| BEVFusion-e |   C+L    | 74.99 | 76.09 |
+| BEVFusion |   C+L    | 70.23 | 72.88 |
 
-### 3D Object Detection on nuScenes validation
+### 3D Object Detection (on nuScenes validation)
 
 |        Model         | Modality | mAP  | NDS  | Checkpoint  |
 | :------------------: | :------: | :--: | :--: | :---------: |
@@ -33,7 +36,7 @@ Multi-sensor fusion is essential for an accurate and reliable autonomous driving
 
 *Note*: The camera-only object detection baseline is a variant of BEVDet-Tiny with a much heavier view transformer and other differences in hyperparameters. Thanks to our [efficient BEV pooling](mmdet3d/ops/bev_pool) operator, this model runs fast and has higher mAP than BEVDet-Tiny under the same input resolution. Please refer to [BEVDet repo](https://github.com/HuangJunjie2017/BEVDet) for the original BEVDet-Tiny implementation. The LiDAR-only baseline is TransFusion-L.
 
-### BEV Map Segmentation on nuScenes validation
+### BEV Map Segmentation (on nuScenes validation)
 
 |        Model         | Modality | mIoU | Checkpoint  |
 | :------------------: | :------: | :--: | :---------: |
