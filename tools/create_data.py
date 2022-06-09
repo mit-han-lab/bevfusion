@@ -1,7 +1,7 @@
 import argparse
 
-from tools.data_converter import nuscenes_converter as nuscenes_converter
-from tools.data_converter.create_gt_database import create_groundtruth_database
+from data_converter import nuscenes_converter as nuscenes_converter
+from data_converter.create_gt_database import create_groundtruth_database
 
 
 def nuscenes_data_prep(
