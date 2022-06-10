@@ -211,6 +211,7 @@ class NuScenesDataset(Custom3DDataset):
 
         data = dict(
             token=info["token"],
+            sample_idx=info['token'],
             lidar_path=info["lidar_path"],
             sweeps=info["sweeps"],
             timestamp=info["timestamp"],
@@ -251,7 +252,7 @@ class NuScenesDataset(Custom3DDataset):
 
                 # camera intrinsics
                 camera_intrinsics = np.eye(4).astype(np.float32)
-                camera_intrinsics[:3, :3] = camera_info["cam_intrinsic"]
+                camera_intrinsics[:3, :3] = camera_info["camera_intrinsics"]
                 data["camera_intrinsics"].append(camera_intrinsics)
 
                 # lidar to image transform
