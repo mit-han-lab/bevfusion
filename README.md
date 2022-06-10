@@ -53,7 +53,7 @@ Multi-sensor fusion is essential for an accurate and reliable autonomous driving
 The code is built with following libraries:
 
 - Python >= 3.8, \<3.9
-- [PyTorch](https://github.com/pytorch/pytorch) >= 1.9
+- [PyTorch](https://github.com/pytorch/pytorch) >= 1.9, \<= 1.10.2
 - [tqdm](https://github.com/tqdm/tqdm)
 - [torchpack](https://github.com/mit-han-lab/torchpack)
 - [mmcv](https://github.com/open-mmlab/mmcv) = 1.4.0
