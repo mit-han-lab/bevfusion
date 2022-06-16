@@ -58,6 +58,7 @@ The code is built with following libraries:
 - [torchpack](https://github.com/mit-han-lab/torchpack)
 - [mmcv](https://github.com/open-mmlab/mmcv) = 1.4.0
 - [mmdetection](http://github.com/open-mmlab/mmdetection) = 2.20.0
+- [nuscenes-dev-kit](https://github.com/nutonomy/nuscenes-devkit)
 
 After installing these dependencies, please run this command to install the codebase:
 

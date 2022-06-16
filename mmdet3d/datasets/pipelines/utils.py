@@ -2,11 +2,11 @@ import warnings
 
 import numba
 import numpy as np
-from numba.errors import NumbaPerformanceWarning
+from numba import errors
 
 from mmdet3d.core.bbox import box_np_ops
 
-warnings.filterwarnings("ignore", category=NumbaPerformanceWarning)
+warnings.filterwarnings("ignore", category=errors.NumbaPerformanceWarning)
 
 
 @numba.njit
