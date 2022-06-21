@@ -43,8 +43,8 @@ Multi-sensor fusion is essential for an accurate and reliable autonomous driving
 |        Model         | Modality | mIoU | Checkpoint  |
 | :------------------: | :------: | :--: | :---------: |
 | [BEVFusion](configs/nuscenes/seg/fusion-bev256d2-lss.yaml)       |   C+L    | 62.69 | [Link](https://bevfusion.mit.edu/files/pretrained/bevfusion-seg.pth) |
-| [Camera-Only Baseline](configs/nuscenes/seg/lidar-centerpoint-bev128.yaml) |    C     | 56.56 | [Link](https://bevfusion.mit.edu/files/pretrained/camera-only-seg.pth) |
-| [LiDAR-Only Baseline](configs/nuscenes/seg/camera-bev256d2.yaml)  |    L     | 48.56 | [Link](https://bevfusion.mit.edu/files/pretrained/lidar-only-seg.pth) |
+| [Camera-Only Baseline](configs/nuscenes/seg/camera-bev256d2.yaml) |    C     | 56.56 | [Link](https://bevfusion.mit.edu/files/pretrained/camera-only-seg.pth) |
+| [LiDAR-Only Baseline](configs/nuscenes/seg/lidar-centerpoint-bev128.yaml)  |    L     | 48.56 | [Link](https://bevfusion.mit.edu/files/pretrained/lidar-only-seg.pth) |
 
 ## Usage
 
