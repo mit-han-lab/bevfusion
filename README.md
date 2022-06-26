@@ -1,6 +1,7 @@
 # BEVFusion
 
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/bevfusion-multi-task-multi-sensor-fusion-with/3d-object-detection-on-nuscenes)](https://paperswithcode.com/sota/3d-object-detection-on-nuscenes?p=bevfusion-multi-task-multi-sensor-fusion-with)
+[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/bevfusion-multi-task-multi-sensor-fusion-with/3d-multi-object-tracking-on-nuscenes)](https://paperswithcode.com/sota/3d-multi-object-tracking-on-nuscenes?p=bevfusion-multi-task-multi-sensor-fusion-with)
 
 ### [website](http://bevfusion.mit.edu/) | [paper](https://arxiv.org/abs/2205.13542) | [video](https://www.youtube.com/watch?v=uCAka90si9E)
 
