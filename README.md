@@ -54,6 +54,7 @@ Multi-sensor fusion is essential for an accurate and reliable autonomous driving
 The code is built with following libraries:
 
 - Python >= 3.8, \<3.9
+- OpenMPI = 4.0.4 and mpi4py = 3.0.3 (Needed for torchpack)
 - Pillow = 8.4.0 (see [here](https://github.com/mit-han-lab/bevfusion/issues/63))
 - [PyTorch](https://github.com/pytorch/pytorch) >= 1.9, \<= 1.10.2
 - [tqdm](https://github.com/tqdm/tqdm)
