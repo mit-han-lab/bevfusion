@@ -11,6 +11,7 @@
 
 **If you are interested in getting updates, please sign up [here](https://docs.google.com/forms/d/e/1FAIpQLSfkmfsX45HstL5rUQlS7xJthhS3Z_Pm2NOVstlXUqgaK4DEfQ/viewform) to get notified!**
 
+- **(2022/8/16)** BEVFusion ranks first on [Waymo](https://waymo.com/open/challenges/2020/3d-detection/) 3D object detection leaderboard among all solutions.
 - **(2022/6/3)** BEVFusion ranks first on [nuScenes](https://nuscenes.org/object-detection?externalData=all&mapData=all&modalities=Any) among all solutions.
 - **(2022/6/3)** We released the first version of BEVFusion (with pre-trained checkpoints and evaluation).
 - **(2022/5/26)** BEVFusion is released on [arXiv](https://arxiv.org/abs/2205.13542).
