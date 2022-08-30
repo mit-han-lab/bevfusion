@@ -93,9 +93,7 @@ mmdetection3d
 │   │   ├── nuscenes_infos_val.pkl
 │   │   ├── nuscenes_infos_test.pkl
 │   │   ├── nuscenes_dbinfos_train.pkl
-│   │   ├── nuscenes_infos_train_mono3d.coco.json
-│   │   ├── nuscenes_infos_val_mono3d.coco.json
-│   │   ├── nuscenes_infos_test_mono3d.coco.json
+
 ```
 
 ### Evaluation
