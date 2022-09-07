@@ -1,5 +1,9 @@
 import argparse
 
+from llvmlite import binding
+binding.initialize()
+binding.initialize_all_targets() # otherwise llvmlite's targets.py throws RuntimeError: Unable to find target for this triple (no targets are registered)
+
 from data_converter import nuscenes_converter as nuscenes_converter
 from data_converter.create_gt_database import create_groundtruth_database
 
