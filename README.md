@@ -64,6 +64,15 @@ The code is built with following libraries:
 - [mmdetection](http://github.com/open-mmlab/mmdetection) = 2.20.0
 - [nuscenes-dev-kit](https://github.com/nutonomy/nuscenes-devkit)
 
+### Docker
+
+Alternatively, you may use our pre-built docker container. Specify your docker run arguments in `docker/run_docker.py` and create the container with the following commands: 
+```bash
+docker pull benjamintherien/dev:cugl11.1.1-py3.8-minimal-torch1.9.0-mmlab-bevfusion
+python docker/run_docker.py
+```
+
+
 After installing these dependencies, please run this command to install the codebase:
 
 ```bash
