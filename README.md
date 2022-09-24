@@ -70,6 +70,33 @@ After installing these dependencies, please run this command to install the code
 python setup.py develop
 ```
 
+We also provide a [Dockerfile](docker/Dockerfile) to ease environment setup. To get started with docker, please make sure that `nvidia-docker` is installed on your machine. After that, please execute the following command to build the docker image:
+
+```bash
+cd docker && docker build .
+```
+
+After building the image, you will be able to see its id via:
+
+```bash
+docker image ls
+```
+
+We can then run the docker with the following command:
+
+```bash
+nvidia-docker run -it -v [dataset directory]:/dataset --shm-size 16g [image size]  /bin/bash
+```
+
+We recommend the users to run data preparation (instructions are available in the next section) outside the docker if possible. Within the docker, please run the following command to clone our repo and install custom CUDA extensions:
+
+```bash
+cd home && git clone https://github.com/mit-han-lab/bevfusion && cd bevfusion
+python setup.py develop
+```
+
+You can then create a symbolic link to the `/dataset` directory. Please make sure that `data/nuscenes` contains the nuScenes dataset.
+
 ### Data Preparation
 
 #### nuScenes
