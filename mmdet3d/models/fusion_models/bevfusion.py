@@ -5,7 +5,6 @@ from mmcv.runner import auto_fp16, force_fp32
 from torch import nn
 from torch.nn import functional as F
 
-# from mmdet3d.core import bbox3d2result, merge_aug_bboxes_3d
 from mmdet3d.models.builder import (
     build_backbone,
     build_fuser,
