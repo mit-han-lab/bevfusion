@@ -89,7 +89,7 @@ cd home && git clone https://github.com/mit-han-lab/bevfusion && cd bevfusion
 python setup.py develop
 ```
 
-You can then create a symbolic link to the `/dataset` directory. Please make sure that `data/nuscenes` contains the nuScenes dataset.
+You can then create a symbolic link `data` to the `/dataset` directory in the docker.
 
 ### Data Preparation
 
