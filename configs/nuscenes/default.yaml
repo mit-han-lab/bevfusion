@@ -11,16 +11,16 @@ voxel_size: [0.1, 0.1, 0.2]
 image_size: [256, 704]
 
 augment2d:
-  resize: [[0.48, 0.48], [0.48, 0.48]]
-  rotate: [0.0, 0.0]
+  resize: [[0.38, 0.55], [0.48, 0.48]]
+  rotate: [-5.4, 5.4]
   gridmask:
     prob: 0.0
     fixed_prob: true
 
 augment3d:
-  scale: [1.0, 1.0]
-  rotate: [0.0, 0.0]
-  translate: 0.0
+  scale: [0.9, 1.1]
+  rotate: [-0.78539816, 0.78539816]
+  translate: 0.5
 
 object_classes:
   - car
@@ -121,7 +121,7 @@ train_pipeline:
     resize_lim: ${augment2d.resize[0]}
     bot_pct_lim: [0.0, 0.0]
     rot_lim: ${augment2d.rotate}
-    rand_flip: false
+    rand_flip: true
     is_train: true
   -
     type: GlobalRotScaleTrans
@@ -148,9 +148,8 @@ train_pipeline:
     classes: ${object_classes}
   -
     type: ImageNormalize
-    mean: [103.530, 116.280, 123.675]
-    std: [58.395, 57.12, 57.375]
-    to_rgb: true
+    mean: [0.485, 0.456, 0.406]
+    std: [0.229, 0.224, 0.225]
   - 
     type: GridMask
     use_h: true
@@ -180,6 +179,7 @@ train_pipeline:
       - camera2ego
       - lidar2ego
       - lidar2camera
+      - camera2lidar
       - lidar2image
       - img_aug_matrix
       - lidar_aug_matrix
@@ -234,9 +234,8 @@ test_pipeline:
     point_cloud_range: ${point_cloud_range}
   -
     type: ImageNormalize
-    mean: [103.530, 116.280, 123.675]
-    std: [58.395, 57.12, 57.375]
-    to_rgb: true
+    mean: [0.485, 0.456, 0.406]
+    std: [0.229, 0.224, 0.225]
   -
     type: DefaultFormatBundle3D
     classes: ${object_classes}
@@ -253,6 +252,7 @@ test_pipeline:
       - camera2ego
       - lidar2ego
       - lidar2camera
+      - camera2lidar
       - lidar2image
       - img_aug_matrix
       - lidar_aug_matrix

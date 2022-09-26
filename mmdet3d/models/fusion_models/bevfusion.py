@@ -5,6 +5,7 @@ from mmcv.runner import auto_fp16, force_fp32
 from torch import nn
 from torch.nn import functional as F
 
+# from mmdet3d.core import bbox3d2result, merge_aug_bboxes_3d
 from mmdet3d.models.builder import (
     build_backbone,
     build_fuser,
@@ -12,8 +13,9 @@ from mmdet3d.models.builder import (
     build_neck,
     build_vtransform,
 )
-from mmdet3d.ops import Voxelization
+from mmdet3d.ops import Voxelization, DynamicScatter
 from mmdet3d.models import FUSIONMODELS
+
 
 from .base import Base3DFusionModel
 
@@ -42,9 +44,13 @@ class BEVFusion(Base3DFusionModel):
                 }
             )
         if encoders.get("lidar") is not None:
+            if encoders["lidar"]["voxelize"].get("max_num_points", -1) > 0:
+                voxelize_module = Voxelization(**encoders["lidar"]["voxelize"])
+            else:
+                voxelize_module = DynamicScatter(**encoders["lidar"]["voxelize"])
             self.encoders["lidar"] = nn.ModuleDict(
                 {
-                    "voxelize": Voxelization(**encoders["lidar"]["voxelize"]),
+                    "voxelize": voxelize_module,
                     "backbone": build_backbone(encoders["lidar"]["backbone"]),
                 }
             )
@@ -89,6 +95,7 @@ class BEVFusion(Base3DFusionModel):
         lidar2camera,
         lidar2image,
         camera_intrinsics,
+        camera2lidar,
         img_aug_matrix,
         lidar_aug_matrix,
         img_metas,
@@ -113,6 +120,7 @@ class BEVFusion(Base3DFusionModel):
             lidar2camera,
             lidar2image,
             camera_intrinsics,
+            camera2lidar,
             img_aug_matrix,
             lidar_aug_matrix,
             img_metas,
@@ -130,18 +138,28 @@ class BEVFusion(Base3DFusionModel):
     def voxelize(self, points):
         feats, coords, sizes = [], [], []
         for k, res in enumerate(points):
-            f, c, n = self.encoders["lidar"]["voxelize"](res)
+            ret = self.encoders["lidar"]["voxelize"](res)
+            if len(ret) == 3:
+                # hard voxelize
+                f, c, n = ret
+            else:
+                assert len(ret) == 2
+                f, c = ret
+                n = None
             feats.append(f)
             coords.append(F.pad(c, (1, 0), mode="constant", value=k))
-            sizes.append(n)
+            if n is not None:
+                sizes.append(n)
 
         feats = torch.cat(feats, dim=0)
         coords = torch.cat(coords, dim=0)
-        sizes = torch.cat(sizes, dim=0)
-
-        if self.voxelize_reduce:
-            feats = feats.sum(dim=1, keepdim=False) / sizes.type_as(feats).view(-1, 1)
-            feats = feats.contiguous()
+        if len(sizes) > 0:
+            sizes = torch.cat(sizes, dim=0)
+            if self.voxelize_reduce:
+                feats = feats.sum(dim=1, keepdim=False) / sizes.type_as(feats).view(
+                    -1, 1
+                )
+                feats = feats.contiguous()
 
         return feats, coords, sizes
 
@@ -155,6 +173,48 @@ class BEVFusion(Base3DFusionModel):
         lidar2camera,
         lidar2image,
         camera_intrinsics,
+        camera2lidar,
+        img_aug_matrix,
+        lidar_aug_matrix,
+        metas,
+        gt_masks_bev=None,
+        gt_bboxes_3d=None,
+        gt_labels_3d=None,
+        **kwargs,
+    ):
+        if isinstance(img, list):
+            raise NotImplementedError
+        else:
+            outputs = self.forward_single(
+                img,
+                points,
+                camera2ego,
+                lidar2ego,
+                lidar2camera,
+                lidar2image,
+                camera_intrinsics,
+                camera2lidar,
+                img_aug_matrix,
+                lidar_aug_matrix,
+                metas,
+                gt_masks_bev,
+                gt_bboxes_3d,
+                gt_labels_3d,
+                **kwargs,
+            )
+            return outputs
+
+    @auto_fp16(apply_to=("img", "points"))
+    def forward_single(
+        self,
+        img,
+        points,
+        camera2ego,
+        lidar2ego,
+        lidar2camera,
+        lidar2image,
+        camera_intrinsics,
+        camera2lidar,
         img_aug_matrix,
         lidar_aug_matrix,
         metas,
@@ -164,7 +224,9 @@ class BEVFusion(Base3DFusionModel):
         **kwargs,
     ):
         features = []
-        for sensor in self.encoders:
+        for sensor in (
+            self.encoders if self.training else list(self.encoders.keys())[::-1]
+        ):
             if sensor == "camera":
                 feature = self.extract_camera_features(
                     img,
@@ -174,6 +236,7 @@ class BEVFusion(Base3DFusionModel):
                     lidar2camera,
                     lidar2image,
                     camera_intrinsics,
+                    camera2lidar,
                     img_aug_matrix,
                     lidar_aug_matrix,
                     metas,
@@ -183,6 +246,10 @@ class BEVFusion(Base3DFusionModel):
             else:
                 raise ValueError(f"unsupported sensor: {sensor}")
             features.append(feature)
+
+        if not self.training:
+            # avoid OOM
+            features = features[::-1]
 
         if self.fuser is not None:
             x = self.fuser(features)
