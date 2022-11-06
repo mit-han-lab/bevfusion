@@ -23,12 +23,24 @@ Multi-sensor fusion is essential for an accurate and reliable autonomous driving
 
 ## Results
 
+### 3D Object Detection (on Waymo test)
+
+|   Model   | mAP-L1 | mAPH-L1  | mAP-L2  | mAPH-L2  |
+| :-------: | :------: | :--: | :--: | :--: |
+| [BEVFusion](https://waymo.com/open/challenges/entry/?challenge=DETECTION_3D&challengeId=DETECTION_3D&emailId=f58eed96-8bb3&timestamp=1658347965704580) |    82.72   |  81.35  | 77.65  |  76.33 |
+| [BEVFusion-TTA](https://waymo.com/open/challenges/entry/?challenge=DETECTION_3D&challengeId=DETECTION_3D&emailId=94ddc185-d2ce&timestamp=1663562767759105) | 86.04    |  84.76 | 81.22  |  79.97 |
+
+Here, BEVFusion only uses a single model without any test time augmentation. BEVFusion-TTA uses single model with test-time augmentation and no model ensembling is applied. 
+
 ### 3D Object Detection (on nuScenes test)
 
 |   Model   | Modality | mAP  | NDS  |
 | :-------: | :------: | :--: | :--: |
 | BEVFusion-e |   C+L    | 74.99 | 76.09 |
 | BEVFusion |   C+L    | 70.23 | 72.88 |
+| BEVFusion-base* |   C+L    | 71.72 | 73.83 |
+
+*: We scaled up MACs of the model to match the computation cost of concurrent work.
 
 ### 3D Object Detection (on nuScenes validation)
 
