@@ -183,6 +183,16 @@ For LiDAR-only BEV segmentation model, please run:
 torchpack dist-run -np 8 python tools/train.py configs/nuscenes/seg/lidar-centerpoint-bev128.yaml
 ```
 
+For BEVFusion detection model, please run:
+```bash
+torchpack dist-run -np 8 python tools/train.py configs/nuscenes/det/transfusion/secfpn/camera+lidar/swint_v0p075/convfuser.yaml --model.encoders.camera.backbone.init_cfg.checkpoint pretrained/swint-nuimages-pretrained.pth --load_from pretrained/lidar-only-det.pth 
+```
+
+For BEVFusion segmentation model, please run:
+```bash
+torchpack dist-run -np 8 python tools/train.py configs/nuscenes/seg/fusion-bev256d2-lss.yaml --model.encoders.camera.backbone.init_cfg.checkpoint pretrained/swint-nuimages-pretrained.pth
+```
+
 ## FAQs
 
 Q: Can we directly use the info files prepared by mmdetection3d?
