@@ -193,6 +193,8 @@ For BEVFusion segmentation model, please run:
 torchpack dist-run -np 8 python tools/train.py configs/nuscenes/seg/fusion-bev256d2-lss.yaml --model.encoders.camera.backbone.init_cfg.checkpoint pretrained/swint-nuimages-pretrained.pth
 ```
 
+Note: please run `tools/test.py` separately after training to get the final evaluation metrics.
+
 ## FAQs
 
 Q: Can we directly use the info files prepared by mmdetection3d?
