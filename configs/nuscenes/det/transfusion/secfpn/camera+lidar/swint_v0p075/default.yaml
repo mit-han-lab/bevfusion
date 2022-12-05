@@ -43,3 +43,9 @@ model:
       test_cfg:
         grid_size: [1440, 1440, 41]
 
+lr_config:
+  policy: CosineAnnealing
+  warmup: linear
+  warmup_iters: 500
+  warmup_ratio: 0.33333333
+  min_lr_ratio: 1.0e-3
