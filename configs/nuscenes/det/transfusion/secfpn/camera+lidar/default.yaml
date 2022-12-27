@@ -53,3 +53,10 @@ model:
           - [0, 0, [1, 1, 0]]
           - [0, 0]
         block_type: basicblock
+
+lr_config: null
+
+optimizer:
+  lr: 2.0e-4
+
+max_epochs: 6

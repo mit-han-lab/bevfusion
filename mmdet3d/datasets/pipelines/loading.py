@@ -5,6 +5,8 @@ import mmcv
 import numpy as np
 from nuscenes.map_expansion.map_api import NuScenesMap
 from nuscenes.map_expansion.map_api import locations as LOCATIONS
+from PIL import Image
+
 
 from mmdet3d.core.points import BasePoints, get_points_type
 from mmdet.datasets.builder import PIPELINES
@@ -49,26 +51,25 @@ class LoadMultiViewImageFromFiles:
         """
         filename = results["image_paths"]
         # img is of shape (h, w, c, num_views)
-        img = np.stack(
-            [mmcv.imread(name, self.color_type) for name in filename], axis=-1
-        )
-        if self.to_float32:
-            img = img.astype(np.float32)
+        # modified for waymo
+        images = []
+        h, w = 0, 0
+        for name in filename:
+            images.append(Image.open(name))
+        
+        #TODO: consider image padding in waymo
+
         results["filename"] = filename
         # unravel to list, see `DefaultFormatBundle` in formating.py
         # which will transpose each image separately and then stack into array
-        results["img"] = [img[..., i] for i in range(img.shape[-1])]
-        results["img_shape"] = img.shape
-        results["ori_shape"] = img.shape
+        results["img"] = images
+        # [1600, 900]
+        results["img_shape"] = images[0].size
+        results["ori_shape"] = images[0].size
         # Set initial values for default meta_keys
-        results["pad_shape"] = img.shape
+        results["pad_shape"] = images[0].size
         results["scale_factor"] = 1.0
-        num_channels = 1 if len(img.shape) < 3 else img.shape[2]
-        results["img_norm_cfg"] = dict(
-            mean=np.zeros(num_channels, dtype=np.float32),
-            std=np.ones(num_channels, dtype=np.float32),
-            to_rgb=False,
-        )
+        
         return results
 
     def __repr__(self):

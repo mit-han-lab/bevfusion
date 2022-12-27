@@ -236,6 +236,7 @@ class NuScenesDataset(Custom3DDataset):
             data["lidar2image"] = []
             data["camera2ego"] = []
             data["camera_intrinsics"] = []
+            data["camera2lidar"] = []
 
             for _, camera_info in info["cams"].items():
                 data["image_paths"].append(camera_info["data_path"])
@@ -267,10 +268,14 @@ class NuScenesDataset(Custom3DDataset):
                 camera2ego[:3, 3] = camera_info["sensor2ego_translation"]
                 data["camera2ego"].append(camera2ego)
 
-        # TODO (Haotian): test set submission.
+                # camera to lidar transform
+                camera2lidar = np.eye(4).astype(np.float32)
+                camera2lidar[:3, :3] = camera_info["sensor2lidar_rotation"]
+                camera2lidar[:3, 3] = camera_info["sensor2lidar_translation"]
+                data["camera2lidar"].append(camera2lidar)
+
         annos = self.get_ann_info(index)
         data["ann_info"] = annos
-        
         return data
 
     def get_ann_info(self, index):

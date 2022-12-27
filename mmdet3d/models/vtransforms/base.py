@@ -78,16 +78,15 @@ class BaseTransform(nn.Module):
     @force_fp32()
     def get_geometry(
         self,
-        rots,
-        trans,
+        camera2lidar_rots,
+        camera2lidar_trans,
         intrins,
         post_rots,
         post_trans,
-        lidar2ego_rots,
-        lidar2ego_trans,
         **kwargs,
     ):
-        B, N, _ = trans.shape
+        B, N, _ = camera2lidar_trans.shape
+
         # undo post-transformation
         # B x N x D x H x W x 3
         points = self.frustum - post_trans.view(B, N, 1, 1, 1, 3)
@@ -96,7 +95,7 @@ class BaseTransform(nn.Module):
             .view(B, N, 1, 1, 1, 3, 3)
             .matmul(points.unsqueeze(-1))
         )
-        # cam_to_ego
+        # cam_to_lidar
         points = torch.cat(
             (
                 points[:, :, :, :, :, :2] * points[:, :, :, :, :, 2:3],
@@ -104,17 +103,9 @@ class BaseTransform(nn.Module):
             ),
             5,
         )
-        combine = rots.matmul(torch.inverse(intrins))
+        combine = camera2lidar_rots.matmul(torch.inverse(intrins))
         points = combine.view(B, N, 1, 1, 1, 3, 3).matmul(points).squeeze(-1)
-        points += trans.view(B, N, 1, 1, 1, 3)
-        # ego_to_lidar
-        points -= lidar2ego_trans.view(B, 1, 1, 1, 1, 3)
-        points = (
-            torch.inverse(lidar2ego_rots)
-            .view(B, 1, 1, 1, 1, 3, 3)
-            .matmul(points.unsqueeze(-1))
-            .squeeze(-1)
-        )
+        points += camera2lidar_trans.view(B, N, 1, 1, 1, 3)
 
         if "extra_rots" in kwargs:
             extra_rots = kwargs["extra_rots"]
@@ -181,9 +172,9 @@ class BaseTransform(nn.Module):
         lidar2camera,
         lidar2image,
         camera_intrinsics,
+        camera2lidar,
         img_aug_matrix,
         lidar_aug_matrix,
-        metas=None,
         **kwargs,
     ):
         rots = camera2ego[..., :3, :3]
@@ -193,19 +184,20 @@ class BaseTransform(nn.Module):
         post_trans = img_aug_matrix[..., :3, 3]
         lidar2ego_rots = lidar2ego[..., :3, :3]
         lidar2ego_trans = lidar2ego[..., :3, 3]
+        camera2lidar_rots = camera2lidar[..., :3, :3]
+        camera2lidar_trans = camera2lidar[..., :3, 3]
+
         extra_rots = lidar_aug_matrix[..., :3, :3]
         extra_trans = lidar_aug_matrix[..., :3, 3]
 
         geom = self.get_geometry(
-            rots,
-            trans,
+            camera2lidar_rots,
+            camera2lidar_trans,
             intrins,
             post_rots,
             post_trans,
-            lidar2ego_rots,
-            lidar2ego_trans,
             extra_rots=extra_rots,
-            extra_trans=extra_trans
+            extra_trans=extra_trans,
         )
 
         x = self.get_cam_feats(img)
@@ -224,6 +216,7 @@ class BaseDepthTransform(BaseTransform):
         lidar2camera,
         lidar2image,
         cam_intrinsic,
+        camera2lidar,
         img_aug_matrix,
         lidar_aug_matrix,
         metas,
@@ -236,18 +229,27 @@ class BaseDepthTransform(BaseTransform):
         post_trans = img_aug_matrix[..., :3, 3]
         lidar2ego_rots = lidar2ego[..., :3, :3]
         lidar2ego_trans = lidar2ego[..., :3, 3]
-        extra_rots = lidar_aug_matrix[..., :3, :3]
-        extra_trans = lidar_aug_matrix[..., :3, 3]
+        camera2lidar_rots = camera2lidar[..., :3, :3]
+        camera2lidar_trans = camera2lidar[..., :3, 3]
+
+        # print(img.shape, self.image_size, self.feature_size)
 
         batch_size = len(points)
-        depth = torch.zeros(batch_size, 6, 1, *self.image_size).to(points[0].device)
+        depth = torch.zeros(batch_size, img.shape[1], 1, *self.image_size).to(
+            points[0].device
+        )
 
         for b in range(batch_size):
-            cur_coords = points[b][:, :3].transpose(1, 0)
+            cur_coords = points[b][:, :3]
             cur_img_aug_matrix = img_aug_matrix[b]
             cur_lidar_aug_matrix = lidar_aug_matrix[b]
             cur_lidar2image = lidar2image[b]
 
+            # inverse aug
+            cur_coords -= cur_lidar_aug_matrix[:3, 3]
+            cur_coords = torch.inverse(cur_lidar_aug_matrix[:3, :3]).matmul(
+                cur_coords.transpose(1, 0)
+            )
             # lidar2image
             cur_coords = cur_lidar2image[:, :3, :3].matmul(cur_coords)
             cur_coords += cur_lidar2image[:, :3, 3].reshape(-1, 3, 1)
@@ -270,19 +272,21 @@ class BaseDepthTransform(BaseTransform):
                 & (cur_coords[..., 1] < self.image_size[1])
                 & (cur_coords[..., 1] >= 0)
             )
-            for c in range(6):
+            for c in range(on_img.shape[0]):
                 masked_coords = cur_coords[c, on_img[c]].long()
                 masked_dist = dist[c, on_img[c]]
                 depth[b, c, 0, masked_coords[:, 0], masked_coords[:, 1]] = masked_dist
 
+        extra_rots = lidar_aug_matrix[..., :3, :3]
+        extra_trans = lidar_aug_matrix[..., :3, 3]
         geom = self.get_geometry(
-            rots,
-            trans,
+            camera2lidar_rots,
+            camera2lidar_trans,
             intrins,
             post_rots,
             post_trans,
-            lidar2ego_rots,
-            lidar2ego_trans,
+            extra_rots=extra_rots,
+            extra_trans=extra_trans,
         )
 
         x = self.get_cam_feats(img, depth)

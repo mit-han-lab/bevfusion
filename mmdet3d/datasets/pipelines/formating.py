@@ -7,6 +7,8 @@ from mmdet3d.core.points import BasePoints
 from mmdet.datasets.builder import PIPELINES
 from mmdet.datasets.pipelines import to_tensor
 
+import torch
+
 
 @PIPELINES.register_module()
 class DefaultFormatBundle3D:
@@ -96,14 +98,7 @@ class DefaultFormatBundle3D:
                         dtype=np.int64,
                     )
         if "img" in results:
-            if isinstance(results["img"], list):
-                # process multiple imgs in single frame
-                imgs = [img.transpose(2, 0, 1) for img in results["img"]]
-                imgs = np.ascontiguousarray(np.stack(imgs, axis=0))
-                results["img"] = DC(to_tensor(imgs), stack=True)
-            else:
-                img = np.ascontiguousarray(results["img"].transpose(2, 0, 1))
-                results["img"] = DC(to_tensor(img), stack=True)
+            results["img"] = DC(torch.stack(results["img"]), stack=True)
 
         for key in [
             "proposals",

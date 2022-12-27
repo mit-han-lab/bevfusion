@@ -1,6 +1,6 @@
 augment3d:
-  scale: [1.0, 1.0]
-  rotate: [0.0, 0.0]
+  scale: [0.95, 1.05]
+  rotate: [-0.3925, 0.3925]
   translate: 0
 
 model:

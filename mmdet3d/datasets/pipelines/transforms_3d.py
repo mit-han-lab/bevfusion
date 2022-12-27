@@ -3,6 +3,7 @@ from typing import Any, Dict
 import mmcv
 import numpy as np
 import torch
+import torchvision
 from mmcv import is_tuple_of
 from mmcv.utils import build_from_cfg
 from numpy import random
@@ -34,7 +35,7 @@ class ImageAug3D:
         self.is_train = is_train
 
     def sample_augmentation(self, results):
-        H, W, _, _ = results["ori_shape"]
+        W, H = results["ori_shape"]
         fH, fW = self.final_dim
         if self.is_train:
             resize = np.random.uniform(*self.resize_lim)
@@ -62,13 +63,11 @@ class ImageAug3D:
         self, img, rotation, translation, resize, resize_dims, crop, flip, rotate
     ):
         # adjust image
-        img = Image.fromarray(img.astype(np.uint8))
         img = img.resize(resize_dims)
         img = img.crop(crop)
         if flip:
             img = img.transpose(method=Image.FLIP_LEFT_RIGHT)
         img = img.rotate(rotate)
-        img = np.array(img).astype(np.float32)
 
         # post-homography transformation
         rotation *= resize
@@ -902,17 +901,19 @@ class ImagePad:
 
 @PIPELINES.register_module()
 class ImageNormalize:
-    def __init__(self, mean, std, to_rgb=True):
-        self.mean = np.array(mean, dtype=np.float32)
-        self.std = np.array(std, dtype=np.float32)
-        self.to_rgb = to_rgb
+    def __init__(self, mean, std):
+        self.mean = mean
+        self.std = std
+        self.compose = torchvision.transforms.Compose(
+            [
+                torchvision.transforms.ToTensor(),
+                torchvision.transforms.Normalize(mean=mean, std=std),
+            ]
+        )
 
     def __call__(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        data["img"] = [
-            mmcv.imnormalize(img, self.mean, self.std, self.to_rgb)
-            for img in data["img"]
-        ]
-        data["img_norm_cfg"] = dict(mean=self.mean, std=self.std, to_rgb=self.to_rgb)
+        data["img"] = [self.compose(img) for img in data["img"]]
+        data["img_norm_cfg"] = dict(mean=self.mean, std=self.std)
         return data
 
 
