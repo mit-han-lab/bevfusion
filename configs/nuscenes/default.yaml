@@ -1,6 +1,10 @@
 dataset_type: NuScenesDataset
 dataset_root: data/nuscenes/
+dbinfos_prefix: nuscenes-bevfusion
 dataset_prefix: nuscenes-bevfusion
+#bevfusion-tracking
+dataset_infos_root: data/nuscenes/
+#nuscenes-tracking/
 gt_paste_stop_epoch: -1
 reduce_beams: 32
 load_dim: 5
@@ -83,7 +87,7 @@ train_pipeline:
     stop_epoch: ${gt_paste_stop_epoch}
     db_sampler:
       dataset_root: ${dataset_root}
-      info_path: ${dataset_root + dataset_prefix + "_dbinfos_train.pkl"}
+      info_path: ${dataset_root + dbinfos_prefix + "_dbinfos_train.pkl"}
       rate: 1.0
       prepare: 
         filter_by_difficulty: [-1]
@@ -266,7 +270,7 @@ data:
     dataset:
       type: ${dataset_type}
       dataset_root: ${dataset_root}
-      ann_file: ${dataset_root + dataset_prefix + "_infos_train.pkl"}
+      ann_file: ${dataset_infos_root + dataset_prefix + "_infos_train.pkl"}
       pipeline: ${train_pipeline}
       object_classes: ${object_classes}
       map_classes: ${map_classes}
@@ -277,7 +281,7 @@ data:
   val:
     type: ${dataset_type}
     dataset_root: ${dataset_root}
-    ann_file: ${dataset_root + dataset_prefix + "_infos_val.pkl"}
+    ann_file: ${dataset_infos_root + dataset_prefix + "_infos_val.pkl"}
     pipeline: ${test_pipeline}
     object_classes: ${object_classes}
     map_classes: ${map_classes}
@@ -287,7 +291,7 @@ data:
   test:
     type: ${dataset_type}
     dataset_root: ${dataset_root}
-    ann_file: ${dataset_root + dataset_prefix + "_infos_val.pkl"}
+    ann_file: ${dataset_infos_root + dataset_prefix + "_infos_val.pkl"}
     pipeline: ${test_pipeline}
     object_classes: ${object_classes}
     map_classes: ${map_classes}

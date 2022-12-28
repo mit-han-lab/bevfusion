@@ -2,7 +2,8 @@ import argparse
 
 from data_converter import nuscenes_converter as nuscenes_converter
 from data_converter.create_gt_database import create_groundtruth_database
-
+from data_converter.nuscenes_converter_tracking import create_nuscenes_infos_tracking
+import os.path as osp
 
 def nuscenes_data_prep(
     root_path,
@@ -12,6 +13,7 @@ def nuscenes_data_prep(
     out_dir,
     max_sweeps=10,
     load_augmented=None,
+    tracking=False
 ):
     """Prepare data related to nuScenes dataset.
 
@@ -25,12 +27,21 @@ def nuscenes_data_prep(
         dataset_name (str): The dataset class name.
         out_dir (str): Output directory of the groundtruth database info.
         max_sweeps (int): Number of input consecutive frames. Default: 10
+        tracking (bool): whether to create the tracking verison of the infos file
     """
     if load_augmented is None:
+
+        
         # otherwise, infos must have been created, we just skip.
-        nuscenes_converter.create_nuscenes_infos(
-            root_path, info_prefix, version=version, max_sweeps=max_sweeps
-        )
+        if tracking:
+            create_nuscenes_infos_tracking(
+                root_path, info_prefix, version=version, max_sweeps=max_sweeps, out_dir=out_dir,
+                future_count=6, past_count=4, padding_value = -5000.0
+            )
+        else:
+            nuscenes_converter.create_nuscenes_infos(
+                root_path, info_prefix, version=version, max_sweeps=max_sweeps
+            )
 
         # if version == "v1.0-test":
         #     info_test_path = osp.join(root_path, f"{info_prefix}_infos_test.pkl")
@@ -42,13 +53,13 @@ def nuscenes_data_prep(
         # nuscenes_converter.export_2d_annotation(root_path, info_train_path, version=version)
         # nuscenes_converter.export_2d_annotation(root_path, info_val_path, version=version)
 
-    create_groundtruth_database(
-        dataset_name,
-        root_path,
-        info_prefix,
-        f"{out_dir}/{info_prefix}_infos_train.pkl",
-        load_augmented=load_augmented,
-    )
+    # create_groundtruth_database(
+    #     dataset_name,
+    #     root_path,
+    #     info_prefix,
+    #     f"{out_dir}/{info_prefix}_infos_train.pkl",
+    #     load_augmented=load_augmented,
+    # )
 
 
 parser = argparse.ArgumentParser(description="Data converter arg parser")
@@ -74,6 +85,12 @@ parser.add_argument(
     help="specify sweeps of lidar per example",
 )
 parser.add_argument(
+    '--tracking',
+    action='store_true',
+    default=False,
+    required='False',
+    help='specify whether tracking information should be added')
+parser.add_argument(
     "--out-dir",
     type=str,
     default="./data/kitti",
@@ -96,7 +113,7 @@ if __name__ == "__main__":
         else:
             load_augmented = "pointpainting"
 
-    if args.dataset == "nuscenes" and args.version != "v1.0-mini":
+    if args.dataset == "nuscenes" and args.version == "v1.0-trainval":
         train_version = f"{args.version}-trainval"
         nuscenes_data_prep(
             root_path=args.root_path,
@@ -106,6 +123,7 @@ if __name__ == "__main__":
             out_dir=args.out_dir,
             max_sweeps=args.max_sweeps,
             load_augmented=load_augmented,
+            tracking=args.tracking,
         )
         test_version = f"{args.version}-test"
         nuscenes_data_prep(
@@ -116,6 +134,7 @@ if __name__ == "__main__":
             out_dir=args.out_dir,
             max_sweeps=args.max_sweeps,
             load_augmented=load_augmented,
+            tracking=args.tracking,
         )
     elif args.dataset == "nuscenes" and args.version == "v1.0-mini":
         train_version = f"{args.version}"
@@ -127,4 +146,17 @@ if __name__ == "__main__":
             out_dir=args.out_dir,
             max_sweeps=args.max_sweeps,
             load_augmented=load_augmented,
+            tracking=args.tracking,
+        )
+    elif args.dataset == "nuscenes" and args.version == "v1.0-medium":
+        train_version = f"{args.version}"
+        nuscenes_data_prep(
+            root_path=args.root_path,
+            info_prefix=args.extra_tag,
+            version=train_version,
+            dataset_name="NuScenesDataset",
+            out_dir=args.out_dir,
+            max_sweeps=args.max_sweeps,
+            load_augmented=load_augmented,
+            tracking=args.tracking,
         )

@@ -131,7 +131,9 @@ def main():
 
     configs.load(args.config, recursive=True)
     cfg = Config(recursive_eval(configs), filename=args.config)
-    print(cfg)
+    # print(cfg)
+    print(cfg.pretty_text)
+    # exit(0)
 
     if args.cfg_options is not None:
         cfg.merge_from_dict(args.cfg_options)

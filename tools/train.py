@@ -29,7 +29,9 @@ def main():
     configs.update(opts)
 
     cfg = Config(recursive_eval(configs), filename=args.config)
-
+    
+    print(cfg.pretty_text)
+    # exit(0)
     torch.backends.cudnn.benchmark = cfg.cudnn_benchmark
     torch.cuda.set_device(dist.local_rank())
 
