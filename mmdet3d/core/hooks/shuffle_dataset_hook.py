@@ -1,5 +1,4 @@
-from mmcv.runner import HOOKS, Hook, EvalHook, get_dist_info, NeptuneLoggerHook
-import torch.distributed as dist
+from mmcv.runner import HOOKS, Hook
 import torch
 import random
 import numpy as np
@@ -23,7 +22,7 @@ def set_random_seed(seed, deterministic=False):
 
 @HOOKS.register_module()
 class ShuffleDatasetHook(Hook):
-    """Hook to prevent bug when training tracker with momentum otpimizers"""
+    """Hook to change the shuffle seed at each epoch"""
 
     def after_epoch(self, runner):
         seed = runner.meta['seed'] + runner._epoch

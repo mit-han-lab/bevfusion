@@ -67,6 +67,8 @@ def train_model(
             meta={},
         ),
     )
+
+    runner.meta['seed'] = cfg.seed
     
     if hasattr(runner, "set_dataset"):
         runner.set_dataset(dataset)
