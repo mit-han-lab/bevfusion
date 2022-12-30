@@ -1,7 +1,7 @@
 _base_ = [
     '../_base_/tracking_runtime.py',
-    '../_base_/datasets/nus-medium-3d-tracking.py',
-    '../_base_/trackers/pnp_net_256_lstm_residual_transformer-0-2-8_decisions_cls_emb_gat.py',
+    '../_base_/datasets/nus-medium-3d-tracking-bevfusion.py',
+    '../_base_/trackers/pnp_net_256_lstm_residual_transformer-0-2-8_decisions_cls_emb.py',
     '../_base_/schedules/cyclic_tracking_30e_accum2.py'
 ]
 
@@ -16,13 +16,13 @@ model = dict(
                                         'track_false_positive':'MLP',
                                         'match':'MLP'},),
     trk_manager=dict(
-        use_det_nms=True,
+            use_det_nms=True,
             tracker=dict(use_nms=True,
                         tracking_decisions=['track_false_negative','track_false_positive'],
                         detection_decisions=['det_newborn','det_false_positive'],
                         frameLimit=5,
                         teacher_forcing=True,
-                        propagation_method='future',
+                        propagation_method='velocity',
                         updater=dict(type='TrackingUpdater',
                                     update_config=dict(
                                         det_newborn=dict(decom=False, output=True, active=True),
@@ -47,16 +47,16 @@ model = dict(
                         )
                     ),)
 
-data = dict(
-    samples_per_gpu=1,
-    workers_per_gpu=4,
-)
+# data = dict(
+#     samples_per_gpu=1,
+#     workers_per_gpu=4,
+# )
 
 custom_hooks = [
     dict(type='CustomEval', priority='NORMAL', interval=31, eval_at_zero=False, eval_start_epoch=0),
     dict(type='ShuffleDatasetHook', priority='NORMAL'),
     dict(type='SaveModelToNeptuneHook', priority=40),
-    dict(type='SetEpochInfoHook', priority=1),
+    dict(type='SetEpochInfoHookTracking', priority=1),
 ]
 
 # custom_hooks += [ dict(type='DebugPrintingHook', priority=1+x*10)for x in range(10)]

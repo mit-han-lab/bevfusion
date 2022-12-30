@@ -25,13 +25,22 @@ def main():
     parser.add_argument("--run-dir", metavar="DIR", help="run directory")
     args, opts = parser.parse_known_args()
 
-    configs.load(args.config, recursive=True)
-    configs.update(opts)
 
-    cfg = Config(recursive_eval(configs), filename=args.config)
+    if 'tracking' in args.config.split('/')[0]:
+        cfg = Config.fromfile(args.config)
+        dataloader_kwargs=dict(shuffle=False, prefetch_factor=4)
+        # if opts is not None:
+        #     print(opts)
+        #     cfg.merge_from_dict(opts)
+    else:
+        configs.load(args.config, recursive=True)
+        configs.update(opts)
+        cfg = Config(recursive_eval(configs), filename=args.config)
+        dataloader_kwargs=dict(shuffle=True, prefetch_factor=4)
     
     print(cfg.pretty_text)
     # exit(0)
+    
     torch.backends.cudnn.benchmark = cfg.cudnn_benchmark
     torch.cuda.set_device(dist.local_rank())
 
@@ -65,6 +74,7 @@ def main():
             torch.backends.cudnn.deterministic = True
             torch.backends.cudnn.benchmark = False
 
+    print(cfg.data.train)
     datasets = [build_dataset(cfg.data.train)]
 
     model = build_model(cfg.model)
@@ -82,6 +92,7 @@ def main():
         distributed=True,
         validate=True,
         timestamp=timestamp,
+        dataloader_kwargs=dataloader_kwargs,
     )
 
 

@@ -24,32 +24,10 @@ from mmdet3d.models import FUSIONMODELS
 from mmdet3d.models.detectors.base import Base3DDetector
 from mmdet3d.models import builder
 
+from mmdet3d.core.bbox import LiDARInstance3DBoxes
 
+from .bevfusion_modif import load_pretrained_detector
 
-from mmcv.runner import load_checkpoint
-from mmcv import Config
-from mmdet3d.utils import recursive_eval
-from torchpack.utils.config import configs
-
-
-def loadPretrainedModel(config, loadpath, test=False, cfg_type='torchpack'):
-
-    if cfg_type == 'mmcv':
-        cfg = Config.fromfile(config)
-    elif cfg_type == 'torchpack':
-        configs.load(config, recursive=True)
-        cfg = Config(recursive_eval(configs), filename=config)
-
-    print(cfg.model.test_cfg)
-    if test == True:
-        model = build_model(cfg.model)
-    else:
-        model = build_model(cfg.model, test_cfg=cfg.get('test_cfg'))
-    ckpt = load_checkpoint(
-        model=model,
-        filename=loadpath
-    )
-    return model
 
 
 @FUSIONMODELS.register_module()
@@ -81,13 +59,13 @@ class CenterPointTracker(Base3DDetector):
             compute_loss_det (bool): Whether to compute the loss of the detector or not.
         """
         super(CenterPointTracker, self).__init__()
-        pretrained_config = 'det/transfusion/secfpn/camera+lidar/swint_v0p075/convfuser.yaml'
+        pretrained_config = 'configs/nuscenes/det/transfusion/secfpn/camera+lidar/swint_v0p075/convfuser.yaml'
         load_detector_from = 'pretrained/bevfusion-det.pth'
-        self.detector = loadPretrainedModel(config=pretrained_config,
-                                            loadpath=load_detector_from,
-                                            test=True)
+        self.detector = load_pretrained_detector(config=pretrained_config,
+                                                loadpath=load_detector_from,
+                                                test=True)
 
-        print(self.detector)
+        # print(self.detector)
 
         self.verbose = verbose
         self.use_neck = use_neck['use']
@@ -159,13 +137,13 @@ class CenterPointTracker(Base3DDetector):
     def validate_sequence_train(self, img_metas, first_in_scene):
         for meta, first in zip(img_metas,first_in_scene):
             if first:
-                self.prev_sample = meta['sample_idx']
+                self.prev_sample = meta['token']
             else:
                 try:
-                    assert meta['sample_idx'] == self.sample_map[self.prev_sample]['next']
-                    self.prev_sample = meta['sample_idx']
+                    assert meta['token'] == self.sample_map[self.prev_sample]['next']
+                    self.prev_sample = meta['token']
                 except AssertionError:
-                    print(meta['sample_idx'],"==",self.sample_map[self.prev_sample]['next'])
+                    print(meta['token'],"==",self.sample_map[self.prev_sample]['next'])
                     raise AssertionError
 
     
@@ -227,9 +205,9 @@ class CenterPointTracker(Base3DDetector):
         translations = []
         orientations = []
         for meta, first in zip(img_metas,first_in_scene):
-            orientations.append(Quaternion(self.sample_to_ego_pose[meta['sample_idx']]['rotation']))#,dtype=np.float32))
+            orientations.append(Quaternion(self.sample_to_ego_pose[meta['token']]['rotation']))#,dtype=np.float32))
             translations.append(
-                np.array(self.sample_to_ego_pose[meta['sample_idx']]['translation'],dtype=np.float32))
+                np.array(self.sample_to_ego_pose[meta['token']]['translation'],dtype=np.float32))
         return translations, orientations
 
     def forward_bev(self, pts_feats, before_neck, before_backbone, middle_feats):
@@ -252,12 +230,37 @@ class CenterPointTracker(Base3DDetector):
             self.pts_backbone.train()
             set_bn_to_eval(self.pts_backbone)
 
-    def forward_train(self,points=None,img_metas=None,gt_bboxes_3d=None,
-                    gt_labels_3d=None,gt_labels=None,gt_bboxes=None,img=None,
-                    proposals=None,gt_bboxes_ignore=None,gt_tracks=None,
-                    first_in_scene=None,last_in_scene=None,gt_futures=None,gt_pasts=None,
-                    gt_track_tte=None,lidar2ego_rotation=None,lidar2ego_translation=None,
-                    ego2global_rotation=None,ego2global_translation=None,):
+    # 'points', 'gt_bboxes_3d', 'gt_labels_3d', 'gt_tracks', 'gt_futures', 'gt_pasts', 'gt_track_tte', 'camera_intrinsics', 'camera2ego', 'lidar2ego', 
+    # 'lidar2camera', 'camera2lidar', 'lidar2image', 'img_aug_matrix', 'lidar_aug_matrix', 'metas', 'lidar2ego_translation', 'lidar2ego_rotation',
+    #  'ego2global_rotation', 'ego2global_translation', 'first_in_scene', 'last_in_scene'
+
+    
+    def forward_train(self,
+                      img,
+                      points,
+                      camera2ego,
+                      lidar2ego,
+                      lidar2camera,
+                      lidar2image,
+                      camera_intrinsics,
+                      camera2lidar,
+                      img_aug_matrix,
+                      lidar_aug_matrix,
+                      metas,
+                      gt_masks_bev=None,
+                      gt_bboxes_3d=None,
+                      gt_labels_3d=None,
+                      gt_tracks=None,
+                      gt_futures=None,
+                      gt_pasts=None,
+                      gt_track_tte=None,
+                      first_in_scene=None,
+                      last_in_scene=None,
+                      lidar2ego_translation=None,
+                      lidar2ego_rotation=None,
+                      ego2global_translation=None,
+                      ego2global_rotation=None,
+                      **kwargs):
         """Forward training function.
 
         Args:
@@ -289,6 +292,13 @@ class CenterPointTracker(Base3DDetector):
         Returns:
             dict: Losses of different branches.
         """
+        img_metas = metas
+        for i in range(len(img_metas)):
+            img_metas[i].update(dict(sample_idx=metas[i]['token']))
+        
+        # print(kwargs)
+        # print(img_metas[0].keys())
+        # print(img_metas[0])
 
         loss_dict = dict()
         if self.verbose:
@@ -326,16 +336,24 @@ class CenterPointTracker(Base3DDetector):
 
         #Forward pass through the detector
         losses, bbox_list, img_feats, pts_feats, before_neck, before_backbone, middle_feats = \
-            self.detector.forward_detector_tracking(points=points, 
-                                                    img_metas=img_metas, 
-                                                    gt_bboxes_3d=gt_bboxes_3d,
-                                                    gt_labels_3d=gt_labels_3d, 
-                                                    gt_labels=gt_labels, 
-                                                    gt_bboxes=gt_bboxes,
-                                                    img=img, 
-                                                    proposals=proposals, 
-                                                    gt_bboxes_ignore=gt_bboxes_ignore,
-                                                    compute_loss=self.compute_loss_det)
+            self.detector.forward_detector_tracking(img,
+                                                    points,
+                                                    camera2ego,
+                                                    lidar2ego,
+                                                    lidar2camera,
+                                                    lidar2image,
+                                                    camera_intrinsics,
+                                                    camera2lidar,
+                                                    img_aug_matrix,
+                                                    lidar_aug_matrix,
+                                                    metas,
+                                                    gt_masks_bev=None,
+                                                    gt_bboxes_3d=None,
+                                                    gt_labels_3d=None,
+                                                    **kwargs)
+
+        bbox_list = [[x['boxes_3d'],x['scores_3d'],x['labels_3d']] for x in bbox_list]
+        
         if self.compute_loss_det:
             loss_dict.update(losses)
 
@@ -400,14 +418,14 @@ class CenterPointTracker(Base3DDetector):
             if pad:
                 continue
 
-            if self.sample_map[meta['sample_idx']]['prev'] == '':
-                self.prev_sample = meta['sample_idx']
+            if self.sample_map[meta['token']]['prev'] == '':
+                self.prev_sample = meta['token']
             else:
                 try:
-                    assert meta['sample_idx'] == self.sample_map[self.prev_sample]['next']
-                    self.prev_sample = meta['sample_idx']
+                    assert meta['token'] == self.sample_map[self.prev_sample]['next']
+                    self.prev_sample = meta['token']
                 except AssertionError:
-                    print(meta['sample_idx'],"==",self.sample_map[self.prev_sample]['next'])
+                    print(meta['token'],"==",self.sample_map[self.prev_sample]['next'])
                     raise AssertionError
 
 
@@ -421,13 +439,37 @@ class CenterPointTracker(Base3DDetector):
             self.pts_backbone.eval()
 
 
-    def simple_test(self,points=None,img_metas=None,img=None,gt_bboxes_3d=None,
-                  gt_labels_3d=None,gt_labels=None,gt_bboxes=None,
-                  proposals=None,gt_bboxes_ignore=None,gt_tracks=None,
-                  first_in_scene=None,rescale=False,last_in_scene=None,padded=None,
-                  gt_futures=None,gt_pasts=None, gt_track_tte=None,lidar2ego_rotation=None,
-                  lidar2ego_translation=None,ego2global_rotation=None,ego2global_translation=None,):
+    def simple_test(self,
+                      img,
+                      points,
+                      camera2ego,
+                      lidar2ego,
+                      lidar2camera,
+                      lidar2image,
+                      camera_intrinsics,
+                      camera2lidar,
+                      img_aug_matrix,
+                      lidar_aug_matrix,
+                      metas,
+                      gt_masks_bev=None,
+                      gt_bboxes_3d=None,
+                      gt_labels_3d=None,
+                      gt_tracks=None,
+                      gt_futures=None,
+                      gt_pasts=None,
+                      gt_track_tte=None,
+                      first_in_scene=None,
+                      last_in_scene=None,
+                      lidar2ego_translation=None,
+                      lidar2ego_rotation=None,
+                      ego2global_translation=None,
+                      ego2global_rotation=None,
+                      padded=None,
+                      **kwargs):
         """Test function without augmentaiton for tracking."""
+        img_metas = metas
+        for i in range(len(img_metas)):
+            img_metas[i].update(dict(sample_idx=metas[i]['token']))
         # print('in simple test')
         self.set_eval_mode()
         device = next(self.parameters()).device
@@ -458,16 +500,25 @@ class CenterPointTracker(Base3DDetector):
 
         #Forward pass through the detector
         losses, bbox_list, img_feats, pts_feats, before_neck, before_backbone, middle_feats = \
-            self.detector.forward_detector_tracking(points=points,
-                                                    img_metas=img_metas, 
-                                                    gt_bboxes_3d=gt_bboxes_3d,
-                                                    gt_labels_3d=gt_labels_3d, 
-                                                    gt_labels=gt_labels, 
-                                                    gt_bboxes=gt_bboxes,
-                                                    img=img, 
-                                                    proposals=proposals, 
-                                                    gt_bboxes_ignore=gt_bboxes_ignore,
-                                                    compute_loss=self.compute_loss_det)
+            self.detector.forward_detector_tracking(img,
+                                                    points,
+                                                    camera2ego,
+                                                    lidar2ego,
+                                                    lidar2camera,
+                                                    lidar2image,
+                                                    camera_intrinsics,
+                                                    camera2lidar,
+                                                    img_aug_matrix,
+                                                    lidar_aug_matrix,
+                                                    metas,
+                                                    gt_masks_bev=None,
+                                                    gt_bboxes_3d=None,
+                                                    gt_labels_3d=None,
+                                                    **kwargs)
+        bbox_list = [[x['boxes_3d'],x['scores_3d'],x['labels_3d']] for x in bbox_list]
+
+        # print(bbox_list[0][0])
+        # exit(0)
 
         pts_feats = self.forward_bev(pts_feats, before_neck, before_backbone, middle_feats)
 
@@ -515,7 +566,7 @@ class CenterPointTracker(Base3DDetector):
             if padded[i]:
                 bbox_out[i] = {'pts_bbox' : False}
             else:
-                bbox_out[i]['pts_bbox']['sample_idx'] = img_metas[i]['sample_idx']
+                bbox_out[i]['pts_bbox']['token'] = img_metas[i]['token']
 
 
         
@@ -543,7 +594,7 @@ class CenterPointTracker(Base3DDetector):
 
             if tracking_bbox[i].nelement() != 0:
                 try:
-                    tracking_bbox[i] = img_metas[i]['box_type_3d'](tracking_bbox[i],tracking_bbox[i].shape[1])
+                    tracking_bbox[i] = LiDARInstance3DBoxes(tracking_bbox[i],tracking_bbox[i].shape[1]) # img_metas[i]['box_type_3d'](tracking_bbox[i],tracking_bbox[i].shape[1])
                 except IndexError:
                     print("[Error in Evaluate CenterPointTracker get_predicted_results()] ############################################")
                     print('tracking_bbox',tracking_bbox)
@@ -625,6 +676,9 @@ class CenterPointTracker(Base3DDetector):
             t1 = time.time()
             print("{} Starting train_step()".format(self.log_msg()))
 
+        # print('in train_step()')
+        # print(data.keys())
+        # exit(0)
 
         losses, log_vars_train = self(**data)
         loss, log_vars = self._parse_losses(losses)
@@ -632,14 +686,14 @@ class CenterPointTracker(Base3DDetector):
         log_vars.update(log_vars_train)
         
         outputs = dict(
-            loss=loss, log_vars=log_vars, num_samples=len(data['img_metas']))
+            loss=loss, log_vars=log_vars, num_samples=len(data['metas']))
         
         if self.verbose:
             print("{} Ending train_step() after {}s".format(self.log_msg(),time.time()-t1))
 
         return outputs
 
-    def forward_test(self, points, img_metas, img=None, **kwargs):
+    def forward_test(self, *args, **kwargs):
         """Copied from Base3DDetector
 
         Args:
@@ -654,24 +708,27 @@ class CenterPointTracker(Base3DDetector):
                 torch.Tensor should have a shape NxCxHxW, which contains
                 all images in the batch. Defaults to None.
         """
+        return self.simple_test( *args, **kwargs)
         # print('forward_test metas',img_metas)
 
-        for var, name in [(points, 'points'), (img_metas, 'img_metas')]:
+        for var, name in [(points, 'points'), (metas, 'img_metas')]:
             if not isinstance(var, list):
                 raise TypeError('{} must be a list, but got {}'.format(
                     name, type(var)))
 
         num_augs = len(points)
-        if num_augs != len(img_metas):
+        if num_augs != len(metas):
             raise ValueError(
                 'num of augmentations ({}) != num of image meta ({})'.format(
-                    len(points), len(img_metas)))
+                    len(points), len(metas)))
 
+        # print(kwargs)
+        # print(kwargs.keys())
         if num_augs == 1:
             img = [img] if img is None else img
-            return self.simple_test(points[0], img_metas[0], img[0], **kwargs)
+            return self.simple_test(points[0], metas[0], img[0], **kwargs)
         else:
-            return self.aug_test(points, img_metas, img, **kwargs)
+            return self.aug_test(points, metas, img, **kwargs)
 
 
     def val_step(self, data, optimizer=None):
@@ -685,7 +742,7 @@ class CenterPointTracker(Base3DDetector):
         loss, log_vars = self._parse_losses(losses)
 
         outputs = dict(
-            loss=loss, log_vars=log_vars, num_samples=len(data['img_metas']))
+            loss=loss, log_vars=log_vars, num_samples=len(data['metas']))
 
         return outputs
 

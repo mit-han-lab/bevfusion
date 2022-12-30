@@ -39,3 +39,17 @@ def build_fusion_model(cfg, train_cfg=None, test_cfg=None):
 
 def build_model(cfg, train_cfg=None, test_cfg=None):
     return build_fusion_model(cfg, train_cfg=train_cfg, test_cfg=test_cfg)
+
+
+
+
+TRACKERS = Registry("trackers")
+SUPERVISORS = Registry("supervisors")
+
+def build_tracker(cfg):
+    """Build trackers."""
+    return TRACKERS.build(cfg)
+
+def build_supervisor(cfg):
+    """Build trackers."""
+    return SUPERVISORS.build(cfg)

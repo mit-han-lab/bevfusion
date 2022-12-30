@@ -1,14 +1,14 @@
 _base_ = [ 
-    './centerpoint_decision_tracker_nus-medium_30e_256_0-2_residual_focal_all.py'
+    './centerpoint_decision_tracker_nus-medium_30e_256_0-2_residual_focal_all_bevfusion.py'
 ]
 
-neptune_tags = ['all dec','nms','focal','TF','w45','FL=5','all classes', '30e','consistency w10']
+neptune_tags = ['all dec','nms','focal','TF','w45','FL=5','all classes', '30e',]
 mm = 0.1
 model = dict(
     trk_manager=dict(
             use_det_nms=True,
             is_test_run=False,
-            tracked_classes=['car'],#, 'truck', 'bus', 'trailer','motorcycle', 'bicycle','pedestrian'],
+            tracked_classes=['car', 'truck', 'bus', 'trailer','motorcycle', 'bicycle','pedestrian'],
             tracker=dict(
                         box_output_mode='track',
                         use_pc_feats=False,
@@ -19,7 +19,7 @@ model = dict(
                         use_nms=True,
                         frameLimit=5,
                         teacher_forcing=True,
-                        propagation_method='future',
+                        propagation_method='velocity',
                         updater=dict(type='TrackingUpdater',
                                     update_config=dict(
                                         det_newborn=dict(decom=False, output=True, active=True),

@@ -23,12 +23,13 @@ def train_model(
     distributed=False,
     validate=False,
     timestamp=None,
+    dataloader_kwargs=dict(shuffle=True, prefetch_factor=4),
 ):
     logger = get_root_logger()
 
     # prepare data loaders
     dataset = dataset if isinstance(dataset, (list, tuple)) else [dataset]
-
+    print(dataloader_kwargs)
     data_loaders = [
         build_dataloader(
             ds,
@@ -37,6 +38,7 @@ def train_model(
             None,
             dist=distributed,
             seed=cfg.seed,
+            **dataloader_kwargs
         )
         for ds in dataset
     ]
@@ -95,6 +97,7 @@ def train_model(
         cfg.checkpoint_config,
         cfg.log_config,
         cfg.get("momentum_config", None),
+        custom_hooks_config=cfg.get('custom_hooks', None),
     )
     if isinstance(runner, EpochBasedRunner):
         runner.register_hook(DistSamplerSeedHook())
@@ -112,7 +115,7 @@ def train_model(
             samples_per_gpu=val_samples_per_gpu,
             workers_per_gpu=cfg.data.workers_per_gpu,
             dist=distributed,
-            shuffle=False,
+            **dataloader_kwargs
         )
         eval_cfg = cfg.get("evaluation", {})
         eval_cfg["by_epoch"] = cfg.runner["type"] != "IterBasedRunner"

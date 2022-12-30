@@ -9,7 +9,9 @@ evaluation = dict(interval=100000, pipeline=[])
 find_unused_parameters=True
 dataloader_shuffle=False
 
-
+cudnn_benchmark = False
+seed = 0
+deterministic = False
 
 log_config = dict(interval=16,
                 hooks=[

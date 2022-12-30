@@ -83,6 +83,44 @@ train_pipeline:
     with_label_3d: true
     with_attr_label: False
   -
+    type: ObjectPaste
+    stop_epoch: ${gt_paste_stop_epoch}
+    db_sampler:
+      dataset_root: ${dataset_root}
+      info_path: ${dataset_root + dbinfos_prefix + "_dbinfos_train.pkl"}
+      rate: 1.0
+      prepare: 
+        filter_by_difficulty: [-1]
+        filter_by_min_points:
+          car: 5
+          truck: 5
+          bus: 5
+          trailer: 5
+          construction_vehicle: 5
+          traffic_cone: 5
+          barrier: 5
+          motorcycle: 5
+          bicycle: 5
+          pedestrian: 5
+      classes: ${object_classes}
+      sample_groups:
+        car: 2
+        truck: 3
+        construction_vehicle: 7
+        bus: 4
+        trailer: 6
+        barrier: 2
+        motorcycle: 6
+        bicycle: 6
+        pedestrian: 2
+        traffic_cone: 2
+      points_loader:
+        type: LoadPointsFromFile
+        coord_type: LIDAR
+        load_dim: ${load_dim}
+        use_dim: ${use_dim}
+        reduce_beams: ${reduce_beams}
+  -
     type: ImageAug3D
     final_dim: ${image_size}
     resize_lim: ${augment2d.resize[0]}
@@ -225,7 +263,7 @@ test_pipeline:
       - lidar_aug_matrix
 
 data:
-  samples_per_gpu: 1
+  samples_per_gpu: 4
   workers_per_gpu: 4
   train:
     type: CBGSDataset
