@@ -7,7 +7,7 @@ mm = 0.1
 model = dict(
     trk_manager=dict(
             use_det_nms=True,
-            is_test_run=False,
+            is_test_run=True,
             tracked_classes=['car', 'truck', 'bus', 'trailer','motorcycle', 'bicycle','pedestrian'],
             tracker=dict(
                         box_output_mode='track',
@@ -52,7 +52,7 @@ model = dict(
                     ),))
 
 
-# load_from = 'work_dirs/latest.pth'
+load_from = 'runs/run/latest.pth'
 # load_from = '/btherien/80_amota_medium_model.pth'
 # load_from = "/mnt/bnas/neptune_checkpoints/81.3_amota_focal_nus-medium.pth"
 

@@ -53,7 +53,7 @@ model = dict(
 # )
 
 custom_hooks = [
-    dict(type='CustomEval', priority='NORMAL', interval=31, eval_at_zero=False, eval_start_epoch=0),
+    dict(type='CustomEval', priority='NORMAL', interval=31, eval_at_zero=True, eval_start_epoch=0),
     dict(type='ShuffleDatasetHook', priority='NORMAL'),
     dict(type='SaveModelToNeptuneHook', priority=40),
     dict(type='SetEpochInfoHookTracking', priority=1),

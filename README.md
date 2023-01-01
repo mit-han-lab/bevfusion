@@ -167,6 +167,7 @@ torchpack dist-run -np 8 python tools/test.py configs/nuscenes/seg/fusion-bev256
 
 ```
 torchpack dist-run -np 2 python tools/train.py configs_tracking/centerpoint/centerpoint_decision_tracker_nus-medium_30e_256_0-2_residual_focal_w45_g2_TF_all_bevfusion.py
+torchpack dist-run -np 2 python tools/train.py configs_tracking/centerpoint/centerpoint_decision_tracker_nus-medium_30e_256_0-2_residual_focal_w45_g2_TF_all_bevfusion.py
 ```
 
 
