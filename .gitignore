@@ -2,6 +2,10 @@
 data
 pretrained
 runs
+.neptune
+.vscode
+
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
