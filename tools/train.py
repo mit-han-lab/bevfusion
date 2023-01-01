@@ -4,6 +4,7 @@ import os
 import random
 import time
 
+import os.path as osp
 import numpy as np
 import torch
 from mmcv import Config
@@ -17,7 +18,76 @@ from mmdet3d.models import build_model
 from mmdet3d.utils import get_root_logger, convert_sync_batchnorm, recursive_eval
 
 
+
+def setup_neptune_logger(cfg,args):
+    try:
+        cfg.dataloader_kwargs
+    except AttributeError:
+        raise AttributeError("You need to add 'dataloader_kwargs' to your config file. See 'configs/_base_/reidentification_runtine.py' for an example.")
+
+    try:
+        cfg.train_tracker
+    except AttributeError:
+        raise AttributeError("You need to add 'train_tracker' to your config file. See 'configs/_base_/reidentification_runtine.py' for an example.")
+        
+
+    if cfg.train_tracker:
+        assert cfg.dataloader_kwargs['shuffle'] == False, "You need to set 'dataloader_kwargs.shuffle' to False when training a tracker."
+
+    # if args.cfg_options is not None:
+    #     cfg.merge_from_dict(args.cfg_options)
+
+    # neptune logging setup
+    try:
+        if cfg.log_config.hooks[1].type == 'NeptuneLoggerHook':
+            source_files = [x.strip() for x in cfg._text.split("\n") if x.strip().endswith(".py")]
+            cfg.log_config.hooks[1].init_kwargs['source_files'] = source_files
+            
+            schedule_file = [x for x in source_files if "schedule" in x][0]
+            dataset_file = [x for x in source_files if "/datasets/" in x][0]
+
+            if 'medium' in dataset_file:
+                dataset = 'v1.0-medium'
+            elif 'mini' in dataset_file:
+                dataset = 'v1.0-mini'
+            else:
+                dataset = 'v1.0-trainval'
+
+
+            if cfg.log_config.hooks[1].init_kwargs.project == "bentherien/re-identification":
+                neptune_name = "[Schedule] {} [Config] {}".format(osp.basename(schedule_file), 
+                                                                                        osp.basename(args.config),)
+            else:
+                model_file = [x for x in source_files if "pnp_net" in x][-1]
+                neptune_name = "[Schedule] {} [Model] {} [Config] {} [gpus] {}".format(osp.basename(schedule_file), 
+                                                                                        osp.basename(model_file), 
+                                                                                        osp.basename(args.config),
+                                                                                        cfg.data.train.gpus)
+                                                                                        
+
+            cfg.log_config.hooks[1].init_kwargs['name'] += neptune_name
+            cfg.log_config.hooks[1].init_kwargs['tags'] += [dataset] + cfg.neptune_tags 
+            
+
+            print(cfg.log_config.hooks[1].init_kwargs['name'])
+
+            
+        else:
+            print('###############################################################################################')
+            print('\t WARNING : No NeptuneLoggerHook in config file. This run will not be logged to Neptune.')
+            print('###############################################################################################')
+            time.sleep(3)
+
+    except IndexError:
+
+        pass
+
+    return cfg
+
+
 def main():
+
+    assert '/btherien/github/nuscenes-devkit/python-sdk' in os.environ['PYTHONPATH']
     dist.init()
 
     parser = argparse.ArgumentParser()
@@ -28,10 +98,8 @@ def main():
 
     if 'tracking' in args.config.split('/')[0]:
         cfg = Config.fromfile(args.config)
-        dataloader_kwargs=dict(shuffle=False, prefetch_factor=4)
-        # if opts is not None:
-        #     print(opts)
-        #     cfg.merge_from_dict(opts)
+        cfg = setup_neptune_logger(cfg,args)
+        dataloader_kwargs=cfg.dataloader_kwargs
     else:
         configs.load(args.config, recursive=True)
         configs.update(opts)

@@ -571,6 +571,26 @@ class DecisionTracker(TrackingModules):
     def getMergedFeats(self,*args,**kwargs):
         return getattr(self,f'getMergedFeats_{self.merge_forward}')(*args,**kwargs)
 
+    def getMergedFeats_queries(self,ego,pred_cls,bbox_feats,bev_feats,queries,confidence_scores,point_cloud_range,device,*args,**kwargs):
+        """TODO make this torch processed only"""
+
+        if bbox_feats.nelement() == 0:
+            return torch.tensor([],device=device)
+        
+        #process motion features
+        ego_feat = ego.get_current_feat().repeat(bbox_feats.size(0),1)
+
+        motion_feats = torch.cat([confidence_scores.unsqueeze(1), bbox_feats, ego_feat],dim=1)
+        motion_feats = self.MLP_encode_motion(motion_feats)
+        
+        all_feats = torch.cat([queries, motion_feats],dim=1)
+
+        merged = self.MLPMerge(all_feats)
+        if self.class_embeddings != dict() and self.class_embeddings != None:
+            merged = merged + self.class_embeddings.weight[pred_cls.long(),:]
+
+        return merged, bev_feats, motion_feats
+
 
     def getMergedFeats_interpolate(self,ego,pred_cls,bbox_feats,bev_feats,confidence_scores,point_cloud_range,device,*args,**kwargs):
         """TODO make this torch processed only"""

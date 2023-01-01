@@ -290,8 +290,10 @@ class CenterPointTracker(Base3DDetector):
                 sample is the last in the scene
 
         Returns:
-            dict: Losses of different branches.
+             dict: Losses of different branches.
         """
+        # print('in forward_train')
+        #CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 torchpack dist-run -np 8 python tools/train.py configs_tracking/centerpoint/centerpoint_decision_tracker_nus_20e_0-2_residual_focal_w65_g2_TF_all_bevfusion.py
         img_metas = metas
         for i in range(len(img_metas)):
             img_metas[i].update(dict(sample_idx=metas[i]['token']))
@@ -335,7 +337,7 @@ class CenterPointTracker(Base3DDetector):
         #                 for x in gt_pasts]
 
         #Forward pass through the detector
-        losses, bbox_list, img_feats, pts_feats, before_neck, before_backbone, middle_feats = \
+        losses, bbox_list, queries, pts_feats, before_neck, before_backbone, middle_feats = \
             self.detector.forward_detector_tracking(img,
                                                     points,
                                                     camera2ego,
@@ -353,12 +355,11 @@ class CenterPointTracker(Base3DDetector):
                                                     **kwargs)
 
         bbox_list = [[x['boxes_3d'],x['scores_3d'],x['labels_3d']] for x in bbox_list]
+        queries = [x.squeeze(0).t() for x in queries]
         
         if self.compute_loss_det:
             loss_dict.update(losses)
 
-
-        
 
         out = self.forward_bev(pts_feats, before_neck, before_backbone, middle_feats)
         pts_feats = out #[torch.cat([x,y],dim=1) for x,y in zip(pts_feats,out)]
@@ -383,6 +384,7 @@ class CenterPointTracker(Base3DDetector):
         tracking_losses, log_vars_update, _ = self.trackManager.addDetection(
                 net=self.net,
                 points=points,
+                queries=queries,
                 pts_feats=pts_feats, 
                 bbox_list=bbox_list, 
                 img_metas=img_metas,
@@ -499,7 +501,7 @@ class CenterPointTracker(Base3DDetector):
         gt_track_tte = [x.long() for x in gt_track_tte]
 
         #Forward pass through the detector
-        losses, bbox_list, img_feats, pts_feats, before_neck, before_backbone, middle_feats = \
+        losses, bbox_list, queries, pts_feats, before_neck, before_backbone, middle_feats = \
             self.detector.forward_detector_tracking(img,
                                                     points,
                                                     camera2ego,
@@ -516,6 +518,7 @@ class CenterPointTracker(Base3DDetector):
                                                     gt_labels_3d=None,
                                                     **kwargs)
         bbox_list = [[x['boxes_3d'],x['scores_3d'],x['labels_3d']] for x in bbox_list]
+        queries = [x.squeeze(0).t() for x in queries]
 
         # print(bbox_list[0][0])
         # exit(0)
@@ -531,6 +534,7 @@ class CenterPointTracker(Base3DDetector):
         tracking_losses, log_vars_update, tracking_preds, tracking_score, tracking_bbox, tracking_labels = \
             self.trackManager.addDetection_test(net=self.net,
                                                 points=points,
+                                                queries=queries,
                                                 pts_feats=pts_feats, 
                                                 bbox_list=bbox_list, 
                                                 img_metas=img_metas,

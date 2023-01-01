@@ -7,11 +7,12 @@ work_dir='work_dirs'
 checkpoint_config = dict(interval=1,max_keep_ckpts=1,save_last=True,save_optimizer=True)
 evaluation = dict(interval=100000, pipeline=[])
 find_unused_parameters=True
-dataloader_shuffle=False
 
-cudnn_benchmark = False
-seed = 0
-deterministic = False
+cudnn_benchmark=False
+dataloader_kwargs = dict(shuffle=False, prefetch_factor=10)
+train_tracker = False
+seed=0
+deterministic=False
 
 log_config = dict(interval=16,
                 hooks=[

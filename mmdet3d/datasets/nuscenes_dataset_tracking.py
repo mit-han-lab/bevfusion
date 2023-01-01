@@ -15,7 +15,7 @@ from pyquaternion import Quaternion
 from typing import Tuple, List, Dict
 from mmdet.datasets import DATASETS
 from ..core.bbox import LiDARInstance3DBoxes
-from .nuscenes_dataset import NuScenesDataset, output_to_nusc_box, lidar_nusc_box_to_global
+from .nuscenes_dataset import NuScenesDataset, lidar_nusc_box_to_global
 from nuscenes.utils.data_classes import Box as NuScenesBox
 from nuscenes import NuScenes
 from nuscenes.eval.detection.evaluate import NuScenesEval
@@ -104,6 +104,53 @@ def output_to_nusc_box_tracking(detection,tracking_classes_idx):
             track=tracks[i],
             score=scores[i],
             velocity=velocity)
+        box_list.append(box)
+    return box_list
+
+
+def output_to_nusc_box(detection):
+    """Convert the output to the box class in the nuScenes.
+
+    Args:
+        detection (dict): Detection results.
+
+            - boxes_3d (:obj:`BaseInstance3DBoxes`): Detection bbox.
+            - scores_3d (torch.Tensor): Detection scores.
+            - labels_3d (torch.Tensor): Predicted box labels.
+
+    Returns:
+        list[:obj:`NuScenesBox`]: List of standard NuScenesBoxes.
+    """
+    box3d = detection["boxes_3d"]
+    scores = detection["scores_3d"].numpy()
+    labels = detection["labels_3d"].numpy()
+
+    if len(box3d) == 0:
+        return []
+
+    box_gravity_center = box3d.gravity_center.numpy()
+    box_dims = box3d.dims.numpy()
+    box_yaw = box3d.yaw.numpy()
+    # TODO: check whether this is necessary
+    # with dir_offset & dir_limit in the head
+    box_yaw = -box_yaw - np.pi / 2
+
+    box_list = []
+    for i in range(len(box3d)):
+        quat = pyquaternion.Quaternion(axis=[0, 0, 1], radians=box_yaw[i])
+        velocity = (*box3d.tensor[i, 7:9], 0.0)
+        # velo_val = np.linalg.norm(box3d[i, 7:9])
+        # velo_ori = box3d[i, 6]
+        # velocity = (
+        # velo_val * np.cos(velo_ori), velo_val * np.sin(velo_ori), 0.0)
+        box = NuScenesBox(
+            box_gravity_center[i],
+            box_dims[i],
+            quat,
+            label=labels[i],
+            score=scores[i],
+            velocity=velocity,
+        )
         box_list.append(box)
     return box_list
 

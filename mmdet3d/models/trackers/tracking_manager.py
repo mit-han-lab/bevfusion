@@ -273,7 +273,7 @@ class TrackingManager(nn.Module):
     
     
     
-    def addDetection(self,net,points,pts_feats,bbox_list,img_metas,first_in_scene,last_in_scene,ego_update,
+    def addDetection(self,net,points,queries,pts_feats,bbox_list,img_metas,first_in_scene,last_in_scene,ego_update,
                      gt_labels,gt_bboxes,gt_tracks,device,gt_futures, gt_pasts,gt_track_tte,
                      output_preds=False,return_loss=True,
                      ):
@@ -333,6 +333,7 @@ class TrackingManager(nn.Module):
                     ego=self.ego,
                     pred_cls=bbox_list[i][2],
                     bbox_feats=bbox_list[i][0].tensor.to(device),
+                    queries=queries[i],
                     bbox_side_and_center=get_bbox_sides_and_center(bbox_list[i][0]),
                     bev_feats=pts_feats[0][i,...],
                     confidence_scores=bbox_list[i][1].to(device),
@@ -436,7 +437,7 @@ class TrackingManager(nn.Module):
 
 
 
-    def addDetection_test(self,net,points,pts_feats,bbox_list,img_metas,ego_update,
+    def addDetection_test(self,net,points,queries,pts_feats,bbox_list,img_metas,ego_update,
                           last_in_scene,first_in_scene,device,padded,
                           gt_labels=None,gt_bboxes=None,gt_tracks=None,gt_futures=None,gt_pasts=None,gt_track_tte=None,
                           return_loss=False,output_preds=True):
@@ -485,6 +486,7 @@ class TrackingManager(nn.Module):
                     ego=self.ego,
                     pred_cls=bbox_list[i][2],
                     bbox_feats=bbox_list[i][0].tensor.to(device),
+                    queries=queries[i],
                     bev_feats=pts_feats[0][i,...],
                     bbox_side_and_center=get_bbox_sides_and_center(bbox_list[i][0]),
                     confidence_scores=bbox_list[i][1].to(device),
