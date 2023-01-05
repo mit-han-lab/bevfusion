@@ -22,52 +22,8 @@ from scipy.optimize import linear_sum_assignment
 from pyquaternion import Quaternion
 # from pytorch3d.structures.pointclouds import Pointclouds
 
+from mmdet3d.models.trackers.pc_utils import get_affine_torch, apply_rotation_to_angle, linear_interp_sweeps, interpolate_per_frame
 
-def get_affine_torch(rotation,translation,device):
-    """
-    axis_angle (torch.tensor (B,1)): Rotations given as a vector in axis angle form, as a tensor of shape (…, 3), 
-        where the magnitude is the angle turned anticlockwise in radians around the vector’s direction.
-    """
-    b,_ = rotation.shape
-    out = torch.zeros((b,4,4,), dtype=torch.float32, device=device)
-    out[:,3,3] = 1.0
-    rot = pytorch3d.transforms.axis_angle_to_matrix(rotation)
-    out[:,:3,:3] = rot
-    out[:,[0,1,2],3] = translation
-    return out
-
-
-    
-def get_pts_in_bbox_batched(points,bbox,num_dets,device):
-    pib_idx = points_in_boxes_batch(points[0][: ,:3].unsqueeze(0), temp.tensor.unsqueeze(0),)
-    pib = [points[0][pib_idx[0,:,i].bool() ,:3] for i in range(num_dets)]
-    lengths = torch.tensor([x.size(0) for x in pib],device=device)
-    rot = torch.zeros((num_dets,3),dtype=torch.float32,device=device)
-    rot[:,2] = (temp.tensor[:,6] + np.pi/2 ) * -1.
-    aff = get_affine_torch(rotation=rot,
-                            translation=temp.tensor[:,:3],
-                            device=device)
-    pc = Pointclouds(pib)
-    padded = pc.points_padded()
-    padded = torch.cat([padded, torch.ones((padded.size(0),padded.size(1),1),device=device)],dim=2)
-    trnsf = torch.bmm(torch.linalg.inv(aff),padded.reshape(num_dets,4,-1))
-    return [trnsf[i,:x,:] for i,x in enumerate(lengths)]
-
-def get_pts_in_bbox_seq(points,bbox,num_dets,device):
-    pib_idx = points_in_boxes_batch(points[0][: ,:3].unsqueeze(0), bbox.tensor.unsqueeze(0),)
-    # print('pib_idx.shape',pib_idx.shape)
-    # print(pib_idx.bool())
-    pib = [points[0][pib_idx[0,:,i].bool() ,:3] for i in range(num_dets)]
-    pts = []
-    for i in range(num_dets):
-        temp_bbox = bbox.tensor[i,:].cpu().numpy()
-        aff_r = affine_transform(
-                rotation=np.roll(Quaternion(axis=[0, 0, 1], angle=((temp_bbox[6] + np.pi/2 ) * -1)).elements,-1),
-                rotation_format='quat',
-                translation=temp_bbox[:3],
-            )
-        pts.append(apply_transform(np.linalg.inv(aff_r),pib[i].cpu().numpy()))
-    return pts
 
 
 
@@ -417,10 +373,29 @@ class VirtualTracker(nn.Module):
         self.trkid_to_gt_tte = update_tte
 
 
-    def step(self,ego,net,timestep,points,pred_cls,bev_feats,det_feats,point_cloud_range,bbox,trackCount,device,
-             last_in_scene,det_confidence,sample_token=None,gt_labels=None,
-             gt_bboxes=[],gt_tracks=None,output_preds=False,return_loss=True,gt_futures=None,
-             gt_pasts=None,gt_track_tte=None):
+    def step(self,
+             ego,
+             net,
+             timestep,
+             points,
+             pred_cls,
+             bev_feats,
+             det_feats,
+             point_cloud_range,
+             bbox,
+             trackCount,
+             device,
+             last_in_scene,
+             det_confidence,
+             sample_token=None,
+             gt_labels=None,
+             gt_bboxes=[],
+             gt_tracks=None,
+             output_preds=False,
+             return_loss=True,
+             gt_futures=None,
+             gt_pasts=None,
+             gt_track_tte=None):
         """Take one step forward in time by processing the current frame.
 
         Args:
@@ -474,6 +449,20 @@ class VirtualTracker(nn.Module):
             temp.tensor = temp.tensor[:,:-2] # must be tensor of size 7
             t1 = time.time()
             import timeit
+
+
+
+            
+            centered, lengths = interpolate_per_frame(ts1,
+                                                      ts2,
+                                                      bboxes,
+                                                      offset,
+                                                      sweeps_infos,
+                                                      pts_sweeps,
+                                                      device=device)
+            pts_batched = get_input_batch(centered,lengths,subsample_number=512,device=device)
+
+
 
             t1 = timeit.timeit(lambda : get_pts_in_bbox_batched(points,bbox=temp,num_dets=num_dets,device=device),number=1000)
             t2 = timeit.timeit(lambda : get_pts_in_bbox_seq(points,bbox=temp,num_dets=num_dets,device=device),number=1000)

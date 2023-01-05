@@ -2,10 +2,10 @@ _base_ = [
     './centerpoint_decision_tracker_nus-medium_30e_256_0-2_residual_focal_all_bevfusion.py'
 ]
 
-neptune_tags = ['all dec','nms','focal','TF','w45','FL=5','all classes', '30e','conf filter 0.00001']
+neptune_tags = ['GT Testing', 'confidence_threshold=0.001']#['all dec','nms','focal','TF','w45','FL=5','all classes', '30e','conf filter 0.000001']
 mm = 0.1
 model = dict(
-    confidence_threshold=0,#0.00001,
+    confidence_threshold=0.001,
     trk_manager=dict(
             use_det_nms=True,
             is_test_run=True,
@@ -14,7 +14,7 @@ model = dict(
                         box_output_mode='track',
                         use_pc_feats=False,
                         use_mp_feats=True,
-                        gt_testing=False,
+                        gt_testing=True,
                         cls='All',
                         visualize_cost_mat=False,
                         use_nms=True,
@@ -53,7 +53,7 @@ model = dict(
                     ),))
 
 
-load_from = 'runs/run/latest.pth'
+# load_from = 'runs/run/latest.pth'
 
 data = dict(
     samples_per_gpu=1,

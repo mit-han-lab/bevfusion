@@ -10,6 +10,7 @@ import torch.distributed as dist
 import numpy as np
 
 from mmcv.runner import HOOKS, Hook, EvalHook, get_dist_info, NeptuneLoggerHook
+from neptune.new.types import File
 
 from .utils import  (get_mistakes_summary, get_text_summary_mistakes, show_mistakes_ids_pct, get_metrics_summary, \
     get_metrics_from_summary, plot_track_length_frequency, show_metrics_decisions, show_metrics_dec_pct)
@@ -66,9 +67,9 @@ class CustomEval(Hook):
         plots += show_metrics_dec_pct(metrics)
 
 
-        from neptune.new.types import File
+        
         for f in plots:
-            neptune[f].log(File(f))
+            neptune['mistakes_and_metrics'].log(File(f))
 
 
     def validation_step(self, runner):
@@ -86,6 +87,11 @@ class CustomEval(Hook):
         rank, world_size = get_dist_info()
         if world_size == 1:
             results, all_log_vars = single_gpu_test_simple(runner.model, dataloader)
+            print('\n\nLogging all vars to all_log_vars.pkl\n ')
+            pickle.dump(all_log_vars, open('all_log_vars.pkl','wb'))
+            self.log_eval_to_neptune(runner,neptune,all_log_vars)
+
+
             train = False if 'val' in dataloader.dataset.dataset.ann_file else True
             if results == None: 
                 pass
@@ -105,7 +111,7 @@ class CustomEval(Hook):
                 self.log_tracking_eval_to_neptune(runner,neptune,metrics_summary,prefix='det-metric: overall/')
         else:
             results, all_log_vars = multi_gpu_test(runner.model, dataloader, tmpdir=tmpdir, gpu_collect=True)
-            # print("\n[after multi_gpu_test] current runner.rank:{} resulta:{} ".format(runner.rank,results))
+            print("\n[after multi_gpu_test] current runner.rank:{}".format(runner.rank))
             
             if runner.rank == 0:
 
@@ -132,6 +138,7 @@ class CustomEval(Hook):
                     del metrics_summary['cfg']
                     self.log_tracking_eval_to_neptune(runner,neptune,metrics_summary,prefix='det-metric: overall/')
             
+            print('before dist barrier')
             dist.barrier()
      
 
@@ -237,7 +244,7 @@ def multi_gpu_test(model, data_loader, tmpdir=None, gpu_collect=False):
         # if i > 100: 
         #     break
 
-
+    print("Exiting for in multi_gpu_test")
     # collect results from all ranks
     if gpu_collect:
         results = collect_results_gpu(results, len(dataset))
@@ -251,6 +258,7 @@ def multi_gpu_test(model, data_loader, tmpdir=None, gpu_collect=False):
 
 
 def collect_results_gpu(result_part, size):
+    print("Entering collect_results_gpu")
     rank, world_size = get_dist_info()
     # dump result part to tensor with pickle
     part_tensor = torch.tensor(
@@ -283,6 +291,7 @@ def collect_results_gpu(result_part, size):
         # the dataloader may pad some samples
         # ordered_results = ordered_results[:size]
 
+        print("Exiting collect_results_gpu")
         return ordered_results
 
 

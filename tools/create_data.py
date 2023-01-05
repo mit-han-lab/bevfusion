@@ -29,6 +29,7 @@ def nuscenes_data_prep(
         max_sweeps (int): Number of input consecutive frames. Default: 10
         tracking (bool): whether to create the tracking verison of the infos file
     """
+    #python tools/create_data.py nuscenes --root-path data/nuscenes --version v1.0-mini --extra-tag bevfusion-tracking-mini --out-dir data/nuscenes/nuscenes-tracking/ --tracking
     if load_augmented is None:
 
         
@@ -114,7 +115,7 @@ if __name__ == "__main__":
             load_augmented = "pointpainting"
 
     if args.dataset == "nuscenes" and args.version == "v1.0-trainval":
-        train_version = f"{args.version}-trainval"
+        train_version = f"{args.version}"
         nuscenes_data_prep(
             root_path=args.root_path,
             info_prefix=args.extra_tag,
@@ -125,7 +126,7 @@ if __name__ == "__main__":
             load_augmented=load_augmented,
             tracking=args.tracking,
         )
-        test_version = f"{args.version}-test"
+        test_version = f"v1.0-test"
         nuscenes_data_prep(
             root_path=args.root_path,
             info_prefix=args.extra_tag,

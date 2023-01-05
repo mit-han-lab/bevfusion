@@ -331,7 +331,8 @@ def show_metrics_decisions(metrics,savepath='/tmp/show_metrics_decisions'):
     ax.set_title('F1, Recall, and Precision Metrics for tracking decisions')
     ax.set_xticks(x, labels)
     ax.legend()
-    ax.set_xticklabels([0]+labels) 
+    ax.set_xticklabels(labels) 
+    # ax.set_xticklabels([0]+labels) 
     
     plt.xticks(rotation=30)
     fig.tight_layout()

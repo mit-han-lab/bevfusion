@@ -2,8 +2,11 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 from mmdet.datasets.builder import PIPELINES
 from ..loading import LoadAnnotations3D
+import numpy as np
 
+import mmcv
 
+from mmdet3d.core.points import BasePoints, get_points_type
 
 
 @PIPELINES.register_module()

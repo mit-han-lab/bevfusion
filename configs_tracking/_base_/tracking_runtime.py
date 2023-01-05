@@ -11,7 +11,7 @@ find_unused_parameters=True
 cudnn_benchmark=False
 dataloader_kwargs = dict(shuffle=False, prefetch_factor=10)
 train_tracker = False
-seed=0
+seed=42
 deterministic=False
 
 log_config = dict(interval=16,
