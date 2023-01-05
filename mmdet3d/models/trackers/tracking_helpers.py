@@ -320,8 +320,8 @@ def log_mistakes(tracker,
                 # det_tp_diff_max = torch.max(cost_mat_[:,c]) - cost_mat_[correct_det_idx,c] # difference between the max cost and the cost of the correct entry
                 det_type = 'TP' if det_lookup[c] == 1 else 'FP'
 
-                print('k',k)
-                print('det_mistake',det_mistake)
+                # print('k',k)
+                # print('det_mistake',det_mistake)
                 try:
                     tracker.mistakes_det[k][det_mistake]['count'] += 1
                     tracker.mistakes_det[k][det_mistake]['cost_pred'].append(cost_pred)
@@ -359,8 +359,8 @@ def log_mistakes(tracker,
                 else:
                     raise ValueError('track_lookup[r] = {}'.format(track_lookup[r]))
 
-                print('k',k)
-                print('track_mistake',track_mistake)
+                # print('k',k)
+                # print('track_mistake',track_mistake)
 
                 try:
                     tracker.mistakes_track[k][track_mistake]['count'] += 1
