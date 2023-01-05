@@ -822,6 +822,7 @@ class TransFusionHead(nn.Module):
                                 )
                         else:
                             task_keep_indices = torch.arange(task_mask.sum())
+                            
                         if task_keep_indices.shape[0] != 0:
                             keep_indices = torch.where(task_mask != 0)[0][
                                 task_keep_indices

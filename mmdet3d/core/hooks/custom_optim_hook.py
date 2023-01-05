@@ -52,6 +52,8 @@ class CustomOptimHook(OptimizerHook):
         runner.outputs['loss'].backward()
 
         if self.world_size > 1:
+            if self.verbose:
+                print("{} - dist.barrier()".format(self.log_msg(runner)))
             dist.barrier()
 
         if self.grad_clip is not None:
@@ -84,6 +86,8 @@ class CustomOptimHook(OptimizerHook):
         runner.outputs['loss'].backward()
         
         if self.world_size > 1:
+            if self.verbose:
+                print("{} - dist.barrier()".format(self.log_msg(runner)))
             dist.barrier()
         
 

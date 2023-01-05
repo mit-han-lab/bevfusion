@@ -243,19 +243,20 @@ def log_mistakes(tracker,
                  cost_mat,
                  num_track,
                  num_det,
-                 mistakes_track,
-                 mistakes_det,
                  det_tp_idx,
                  active_tracks,
                  device):
     """
     Retrieve errors from predictions.
-    
     """
     #matches: 100
     cost_mat_ = torch.zeros((dd_mat.size(0),td_mat.size(1),),device=device)
     mask = torch.zeros((dd_mat.size(0),td_mat.size(1),),device=device)
     mask_gt = torch.zeros((dd_mat.size(0),td_mat.size(1),),device=device)
+
+    # print('cost_mat_ shape: ',cost_mat_.shape)
+    # print('mask shape: ',mask.shape)
+    # print('mask_gt shape: ',mask_gt.shape)
     
     cost_mat_[:num_track,:] = td_mat
     cost_mat_[:,:num_det] = dd_mat
@@ -265,7 +266,7 @@ def log_mistakes(tracker,
     mask[decisions['track_match'],decisions['det_match']] = 100
     mask_gt[tp_decisions['pos_track_match'],tp_decisions['pos_det_match']] = 100
     
-    dec_to_idx = {}
+    dec_to_idx = {'match':100}
     for i,k in enumerate(tracker.detection_decisions):
         dec_to_idx[k] = len(dec_to_idx) + 1
         idx = decisions[k]
@@ -291,44 +292,63 @@ def log_mistakes(tracker,
     temp_id = tracker.trkid_to_gt_trkid[active_tracks]
     temp_tte = tracker.trkid_to_gt_tte[active_tracks]
 
-    track_lookup[temp_id > 0] = 1
-    track_lookup[temp_tte <= 0] = 2
+    track_lookup[temp_id >= 0] = 1
+    track_lookup[temp_tte < 0] = 2 # tte=0 is the last frame of the track
     track_lookup[temp_id == -1] = 0
 
-    match_errors = {}
 
+    mask = mask.cpu()
+    mask_gt = mask_gt.cpu()
+    cost_mat_ = cost_mat_.cpu()
 
-    for k in ['match'] + tracker.detection_decisions + tracker.detection_decisions:
+    for k in ['match'] + tracker.detection_decisions + tracker.tracking_decisions:
         # incorrect matches
-        idx = torch.where(reduce(torch.logical_and_,[mask_gt != dec_to_idx[k], mask == dec_to_idx[k]]))
-        for r,c in zip(idx):
-            if c <= num_det:
-                correct_det_idx = torch.where(mask_gt[:,c] != 0)[0]
-                det_mistake = idx_to_dec[mask_gt[correct_det_idx,c]]
-                det_cost_diff = cost_mat_[r,c] - cost_mat_[correct_det_idx,c]
-                det_tp_diff_max = torch.max(cost_mat_[:,c]) - cost_mat_[correct_det_idx,c]
+        idx = torch.where(reduce(torch.logical_and,[mask_gt != dec_to_idx[k], mask == dec_to_idx[k]]))
+        # print('\n\nidx',idx)
+        # print(len(idx[0]))
+        if len(idx[0]) == 0:
+            continue
 
+        for r,c in zip(idx[0],idx[1]):
+            if c < num_det:
+                correct_det_idx = torch.where(mask_gt[:,c] != 0)[0]
+                det_mistake = idx_to_dec[mask_gt[correct_det_idx,c].item()]
+                cost_gt = cost_mat_[correct_det_idx,c]
+                cost_pred = cost_mat_[r,c]
+                cost_max = torch.max(cost_mat_[:,c])
+                # det_cost_diff = cost_mat_[r,c] - cost_mat_[correct_det_idx,c] # difference between the predicted cost and the cost of the correct entry
+                # det_tp_diff_max = torch.max(cost_mat_[:,c]) - cost_mat_[correct_det_idx,c] # difference between the max cost and the cost of the correct entry
                 det_type = 'TP' if det_lookup[c] == 1 else 'FP'
 
-            try:
-                mistakes_det[k][det_mistake]['count'] += 1
-                mistakes_det[k][det_mistake]['cost_diff'].append(det_cost_diff)
-                mistakes_det[k][det_mistake]['tp_diff_max'].append(det_tp_diff_max)
-                mistakes_det[k][det_mistake]['det_type'][det_type] += 1
-            except KeyError:
-                temp = {'FP':0, 'TP':0}
-                temp[track_type] = 1
-                mistakes_det[k][det_mistake] = {'count':1,
-                                                'cost_diff':[det_cost_diff],
-                                                'tp_diff_max':[det_tp_diff_max],
-                                                'det_type':temp,}
-                
+                print('k',k)
+                print('det_mistake',det_mistake)
+                try:
+                    tracker.mistakes_det[k][det_mistake]['count'] += 1
+                    tracker.mistakes_det[k][det_mistake]['cost_pred'].append(cost_pred)
+                    tracker.mistakes_det[k][det_mistake]['cost_gt'].append(cost_gt)
+                    tracker.mistakes_det[k][det_mistake]['cost_max'].append(cost_max)
+                    tracker.mistakes_det[k][det_mistake]['det_type'][det_type] += 1
+                    tracker.mistakes_det[k][det_mistake]['det_type_list'].append(det_type)
+                except KeyError:
+                    temp = {'FP':0, 'TP':0}
+                    temp[det_type] = 1
+                    tracker.mistakes_det[k][det_mistake] = {'count':1,
+                                                            'cost_pred':[cost_pred],
+                                                            'cost_gt':[cost_gt],
+                                                            'cost_max':[cost_max],
+                                                            'det_type_list':[det_type],
+                                                            'det_type':temp,}
+                    
 
-            if r <= num_track:
+            if r < num_track:
                 correct_track_idx = torch.where(mask_gt[r,:] != 0)[0]
-                track_mistake = idx_to_dec[mask_gt[r,correct_track_idx]]
-                track_cost_diff = cost_mat_[r,c] - cost_mat_[r,correct_track_idx]
-                track_tp_diff_max = torch.max(cost_mat_[r,:]) - cost_mat_[r,correct_track_idx]
+                # print('correct_track_idx',correct_track_idx)
+                track_mistake = idx_to_dec[mask_gt[r,correct_track_idx].item()]
+                # track_cost_diff = cost_mat_[r,c] - cost_mat_[r,correct_track_idx]
+                # track_tp_diff_max = torch.max(cost_mat_[r,:]) - cost_mat_[r,correct_track_idx]
+                cost_gt = cost_mat_[r,correct_track_idx]
+                cost_pred = cost_mat_[r,c]
+                cost_max = torch.max(cost_mat_[r,:])
 
                 if track_lookup[r] == 1:
                     track_type = 'TP' 
@@ -339,26 +359,31 @@ def log_mistakes(tracker,
                 else:
                     raise ValueError('track_lookup[r] = {}'.format(track_lookup[r]))
 
+                print('k',k)
+                print('track_mistake',track_mistake)
+
                 try:
-                    mistakes_track[k][track_mistake]['count'] += 1
-                    mistakes_track[k][track_mistake]['cost_diff'].append(track_cost_diff)
-                    mistakes_track[k][track_mistake]['tp_diff_max'].append(track_tp_diff_max)
-                    mistakes_track[k][track_mistake]['track_type'][track_type] += 1
+                    tracker.mistakes_track[k][track_mistake]['count'] += 1
+                    tracker.mistakes_track[k][track_mistake]['cost_pred'].append(cost_pred)
+                    tracker.mistakes_track[k][track_mistake]['cost_gt'].append(cost_gt)
+                    tracker.mistakes_track[k][track_mistake]['cost_max'].append(cost_max)
+                    tracker.mistakes_track[k][track_mistake]['track_type'][track_type] += 1
+                    tracker.mistakes_track[k][track_mistake]['track_type_list'].append(track_type)
                 except KeyError:
                     temp = {'FP':0,'TP-OOR':0,'TP':0}
                     temp[track_type] = 1
-                    mistakes_track[k][track_mistake] = {'count':1,
-                                                        'cost_diff':[track_cost_diff],
-                                                        'tp_diff_max':[track_tp_diff_max],
-                                                        'track_type':temp,}
+                    tracker.mistakes_track[k][track_mistake] = {'count':1,
+                                                                'cost_pred':[cost_pred],
+                                                                'cost_gt':[cost_gt],
+                                                                'cost_max':[cost_max],
+                                                                'track_type_list':[track_type],
+                                                                'track_type':temp,}
 
 
             if k == 'match':
                 try:
-                    match_errors['IDS_{}_to_{}'.format(det_type,track_type)] += 1
+                    tracker.mistakes_match['IDS_{}_to_{}'.format(det_type,track_type)] += 1
                 except KeyError:
-                    match_errors['IDS_{}_to_{}'.format(det_type,track_type)] = 1
+                    tracker.mistakes_match['IDS_{}_to_{}'.format(det_type,track_type)] = 1
                 
 
-
-    return mistakes_track, mistakes_det

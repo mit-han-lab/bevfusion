@@ -106,11 +106,18 @@ def main():
         cfg = Config(recursive_eval(configs), filename=args.config)
         dataloader_kwargs=dict(shuffle=True, prefetch_factor=4)
     
-    print(cfg.pretty_text)
+    # print(cfg.pretty_text)
     # exit(0)
     
     torch.backends.cudnn.benchmark = cfg.cudnn_benchmark
     torch.cuda.set_device(dist.local_rank())
+
+    print("\n\n")
+    print("###############################################################################################")
+    print("Setting local rank to {}".format(dist.local_rank()))
+    print("###############################################################################################")
+    print("\n\n")
+    time.sleep(0.2)
 
     if args.run_dir is None:
         args.run_dir = auto_set_run_dir()
@@ -142,7 +149,7 @@ def main():
             torch.backends.cudnn.deterministic = True
             torch.backends.cudnn.benchmark = False
 
-    print(cfg.data.train)
+    # print(cfg.data.train)
     datasets = [build_dataset(cfg.data.train)]
 
     model = build_model(cfg.model)

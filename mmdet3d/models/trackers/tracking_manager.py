@@ -219,6 +219,14 @@ class TrackingManager(nn.Module):
         rank, world_size = get_dist_info()
         self.count_reset = rank * 100000
         self.rank = rank
+        
+
+        print("\n\n")
+        print("###############################################################################################")
+        print(" track_manager  rank  {}".format(rank))
+        print("###############################################################################################")
+        print("\n\n")
+        time.sleep(1)
 
         self.trackers = {}
 
@@ -480,7 +488,9 @@ class TrackingManager(nn.Module):
             )
 
             if bbox_list[i][1].size(0) == 0:
-                merged = torch.tensor([],device=device)
+                merged = torch.empty([0,net.lstm.hidden_size],dtype=torch.float32,device=device)
+                # torch.tensor([],device=device)
+                print('in bbox_list[i][1].size(0) == 0')
             else:
                 merged, _, _ = net.getMergedFeats(
                     ego=self.ego,

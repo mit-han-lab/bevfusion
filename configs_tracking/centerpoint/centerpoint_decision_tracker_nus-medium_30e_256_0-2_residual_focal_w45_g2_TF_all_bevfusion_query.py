@@ -2,15 +2,19 @@ _base_ = [
     './centerpoint_decision_tracker_nus-medium_30e_256_0-2_residual_focal_all_bevfusion.py'
 ]
 
-neptune_tags = ['all dec','nms','focal','TF','w45','FL=5','all classes', '30e','conf filter 0.00001']
+neptune_tags = ['all dec','nms','focal','TF','w45','FL=5','all classes','30e','queries']
 mm = 0.1
 model = dict(
+    verbose=False,
+    net=dict(merge_forward='queries',),
     confidence_threshold=0,#0.00001,
     trk_manager=dict(
+            verbose=False,
             use_det_nms=True,
-            is_test_run=True,
+            is_test_run=False,
             tracked_classes=['car', 'truck', 'bus', 'trailer','motorcycle', 'bicycle','pedestrian'],
             tracker=dict(
+                        verbose=False,
                         box_output_mode='track',
                         use_pc_feats=False,
                         use_mp_feats=True,
@@ -53,7 +57,9 @@ model = dict(
                     ),))
 
 
-load_from = 'runs/run/latest.pth'
+# load_from = 'runs/run/latest.pth'
+# load_from = '/btherien/80_amota_medium_model.pth'
+# load_from = "/mnt/bnas/neptune_checkpoints/81.3_amota_focal_nus-medium.pth"
 
 data = dict(
     samples_per_gpu=1,

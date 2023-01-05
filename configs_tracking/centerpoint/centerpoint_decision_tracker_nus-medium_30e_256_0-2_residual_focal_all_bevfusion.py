@@ -8,13 +8,13 @@ _base_ = [
 
 model = dict(
     net = dict(type='DecisionTracker',
-                    merge_forward='interpolate',
-                    message_passing_forward='simple',
-                    decisions_forward={'det_newborn':'MLP',
-                                        'det_false_positive':'MLP',
-                                        'track_false_negative':'MLP',
-                                        'track_false_positive':'MLP',
-                                        'match':'MLP'},),
+                merge_forward='interpolate',
+                message_passing_forward='simple',
+                decisions_forward={'det_newborn':'MLP',
+                                    'det_false_positive':'MLP',
+                                    'track_false_negative':'MLP',
+                                    'track_false_positive':'MLP',
+                                    'match':'MLP'},),
     trk_manager=dict(
             use_det_nms=True,
             tracker=dict(use_nms=True,
@@ -60,6 +60,4 @@ custom_hooks = [
 ]
 
 # custom_hooks += [ dict(type='DebugPrintingHook', priority=1+x*10)for x in range(10)]
-
-
 # custom_hooks.0.eval_at_zero=True

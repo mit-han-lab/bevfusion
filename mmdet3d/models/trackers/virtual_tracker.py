@@ -80,14 +80,9 @@ class Center2DRange(object):
         self.distance = distance
 
     def __call__(self, bboxes1, bboxes2, mode='iou', is_aligned=False):
-        """assumes xy are the first two coordinates
-        """
-        
+        """assumes xy are the first two coordinates"""
         iou = torch.cdist(bboxes1[:,:2],bboxes2[:,:2],p=2) 
         # idx1,idx2 = torch.where(iou < self.distance)
-        
-
-
         return iou #, idx1, idx2
 
     def __repr__(self):
@@ -167,9 +162,7 @@ class VirtualTracker(nn.Module):
         self.unmatchedTracks = {} # tensor index : track index
         self.decomTracks = [] # tensor index : track index
 
-        self.mistakes_track, self.mistakes_det = {},{}
-
-        # self.save_feats = []
+        
 
         self.trkid_to_gt_trkid = None
         self.trkid_to_gt_tte = None
@@ -179,6 +172,10 @@ class VirtualTracker(nn.Module):
         self.tracking_decisions = sorted(tracking_decisions) #need to sort for canonical ordering
         self.dd_num = len(detection_decisions)
         self.td_num = len(tracking_decisions)
+
+        self.mistakes_track = {k:dict() for k in self.tracking_decisions + ['match']}
+        self.mistakes_det = {k:dict() for k in self.detection_decisions + ['match']}
+        self.mistakes_match = {}
 
         self.logging = {}
         for k in ['total','det_match'] + self.detection_decisions + self.tracking_decisions:
@@ -220,7 +217,14 @@ class VirtualTracker(nn.Module):
         for k in ['total','det_match'] + self.detection_decisions + self.tracking_decisions:
             self.logging[k+'_correct'] = 0
             self.logging[k+'_gt'] = 0.00000000001 # avoid divide by zero
-            self.logging[k+'_num_pred'] = 0.00000000001 # avoid divide by zero
+            self.logging[k+'_num_pred'] = 0.00000000001 # avoid divide by zero  
+            
+        del self.mistakes_track
+        del self.mistakes_det
+        self.mistakes_track = {k:dict() for k in self.tracking_decisions + ['match']}
+        self.mistakes_det = {k:dict() for k in self.detection_decisions + ['match']}
+        self.mistakes_match = {}
+
 
     def gatherAny(self,feats,index):
         """Indexes into the appropriate tensor to gather the desired
@@ -571,23 +575,21 @@ class VirtualTracker(nn.Module):
                 exit(0)
 
 
-        # if return_loss == False:
-        #     temp = torch.full_like(num_dets,1)
-        #     temp[tp_det_idx] = 0
-        #     fp_det_idx = torch.where(temp == 1)[0]
-        #     self.mistakes_track, self.mistakes_det = log_mistakes(tracker=self,
-        #                                                           tp_decisions=tp_decisions,
-        #                                                           decisions=decisions,
-        #                                                           td_mat=td_mat,
-        #                                                           dd_mat=dd_mat,
-        #                                                           cost_mat=numpy_cost_mat,
-        #                                                           num_track=num_tracks,
-        #                                                           num_det=num_dets,
-        #                                                           mistakes_track=self.mistakes_track,
-        #                                                           mistakes_det=self.mistakes_det,
-        #                                                           det_tp_idx=tp_det_idx,
-        #                                                           active_tracks=self.activeTracks,
-        #                                                           device=device,)
+        if return_loss == False:
+            # temp = torch.ones(num_dets,dtype=torch.long,device=device)
+            # temp[tp_det_idx] = 0
+            # fp_det_idx = torch.where(temp == 1)[0]
+            log_mistakes(tracker=self,
+                        tp_decisions=tp_decisions,
+                        decisions=decisions,
+                        td_mat=td_mat,
+                        dd_mat=dd_mat,
+                        cost_mat=numpy_cost_mat,
+                        num_track=num_tracks,
+                        num_det=num_dets,
+                        det_tp_idx=tp_det_idx,
+                        active_tracks=self.activeTracks,
+                        device=device,)
             
 
         if ( return_loss == True and self.teacher_forcing) or self.gt_testing:
@@ -631,6 +633,7 @@ class VirtualTracker(nn.Module):
                         pred_cls=pred_cls_fn,
                         bbox_feats=bbox_list_fn.tensor.to(device),
                         bbox_side_and_center=get_bbox_sides_and_center(bbox_list_fn),
+                        queries=net.synthetic_query(trk_feats[decisions['track_false_negative'],:]),
                         bev_feats=bev_feats,
                         confidence_scores=confidence_scores_fn,
                         point_cloud_range=point_cloud_range,
@@ -788,6 +791,7 @@ class VirtualTracker(nn.Module):
             metrics[f'eval_scene_total_tracks'] = len(self.tracks)
             metrics.update({'mistakes_track_'+ k:v for k,v in self.mistakes_track.items()})
             metrics.update({'mistakes_det_'+ k:v for k,v in self.mistakes_det.items()})
+            metrics.update({'mistakes_match_'+ k:v for k,v in self.mistakes_match.items()})
 
             return metrics
 
@@ -888,143 +892,3 @@ class VirtualTracker(nn.Module):
 
 
 
-
-
-
-
-
-
-
-
-    #deprecated
-    def initTracks(self,ego,net,timestep,det_feats,bbox,trackCount,device,det_confidence,
-                    sample_token=None, gt_bboxes=[],gt_tracks=None,output_preds=False,
-                    return_loss=True,gt_futures=None,gt_pasts=None,
-                    gt_track_tte=None):
-        """Initializes tracking for the first frame of a new sequence.
-
-        Args:
-            det_feats (torch.Tensor, required): Feature representation 
-                for the detections
-            bbox (torch.Tensor, required): bounding boxes for each 
-                detection
-            lstm (nn.LSTM, required): lstm for processing tracks
-            trackCount (int, required): the number of tracks currently
-                allocated for this scene
-            c0 (torch.Tensor): lstm initial cell state
-            h0 (torch.Tensor): lstm initial hidden state
-            sample_token (str, optional): token of the current detection
-                used for computing performance metrics
-            gt_bboxes (LiDARInstance3DBoxes): Object containing GT bounding boxes
-            gt_tracks (torch.Tensor): GT tracks ids
-            output_preds (bool): If True outputs tracking predictions o/w None
-            return_loss (bool): If True compute the loss
-
-        Returns: 
-            trackCount (int): the new track count
-            log_vars (dict): information to be logged 
-            losses (dict): losses computed from the association matrix
-            (torch.tensor) list of global tracking ids corresponding to the current 
-                detections if output_preds is True, None otherwise
-        """
-        
-        log_vars = {}
-        losses = torch.tensor(0.,dtype=torch.float32,device=device)
-
-        if det_feats.nelement() == 0:
-            print('[WARNING] No detections for this frame',sample_token)
-            #if detections were empty
-            trk_id_preds = torch.tensor([],dtype=torch.float32,device=device)
-            score_preds = torch.tensor([],dtype=torch.float32,device=device)
-            bbox_preds = torch.tensor([],dtype=torch.float32,device=device)
-
-            det_indices = torch.tensor([],dtype=torch.long,device=device)
-            return trackCount, log_vars, losses, (trk_id_preds, score_preds, bbox_preds,)
-
-        new_idx = np.arange(0,det_feats.size(0))
-        self.incrementor(net=net,
-                        active_tracks=self.activeTracks,
-                        hidden_idx=[],
-                        increment_hidden_idx=[],
-                        new_idx=new_idx,
-                        feats=det_feats,
-                        device=device)
-        
-        track_feats = self.incrementor.gatherAny('f',new_idx)
-        forecast_preds = net.MLPPredict(track_feats.clone())
-        refine_preds = net.MLPRefine(track_feats.clone())
-        refine_preds = torch.cat([refine_preds[:,:-1],torch.sigmoid(refine_preds[:,-1]).unsqueeze(1)],dim=1)
-
-
-        self.tracks = [Track(id_=trackCount + ii, 
-                            cls=self.cls, 
-                            sample=sample_token,
-                            det_confidence=det_confidence[ii],
-                            bbox=x.clone(), 
-                            score=refine_preds[ii,-1].detach().clone(),
-                            futures=forecast_preds[ii,:],
-                            xy=refine_preds[ii,-3:-1].detach().clone(),
-                            timestep=timestep,) 
-                        for ii,x in enumerate(bbox)]
-
-        assert len(self.tracks) == self.incrementor.track_feats.size(0)
-
-        trackCount += len(self.tracks)
-        self.activeTracks = [i for i in range(len(self.tracks))]
-
-
-
-
-        if gt_tracks is not None:
-            if gt_bboxes == []:
-                tp_det_idx, tp_gt_idx = [],[]
-            else:
-                ious, tp_det_idx, tp_gt_idx = self.get_iou_idx(bbox,gt_bboxes,device)
-            # create a map from current tracks to their GT track number if their
-            # associated detection is considered a TP
-            self.trkid_to_gt_trkid = torch.full((len(self.tracks),),-1,dtype=torch.long,device=device)
-            self.trkid_to_gt_tte = torch.full((len(self.tracks),),-1,dtype=torch.long,device=device)
-            self.trkid_to_gt_trkid[tp_det_idx] = gt_tracks[tp_gt_idx]
-            self.trkid_to_gt_tte[tp_det_idx] = gt_track_tte[tp_gt_idx]
-
-            dets_to_trk_idx = torch.tensor(self.activeTracks,dtype=torch.long,device=device)
-            refined_bboxes = torch.cat([self.tracks[i].refined_bboxes[-1].unsqueeze(0) for i in dets_to_trk_idx])
-
-
-        #set only TP active 
-        self.activeTracks = [i for i in tp_det_idx.cpu().numpy()]
-        # print(tp_det_idx)
-        # print(self.activeTracks)
-
-
-        if return_loss and gt_tracks is not None: #only calculate loss information at training time
-            refine_loss, summary, log = self.tsup.supervise_refinement(
-                                            tp_det_idx=tp_det_idx,
-                                            tp_gt_idx=tp_gt_idx,
-                                            refine_preds=refine_preds,
-                                            refined_bboxes=refined_bboxes,
-                                            bbox=bbox,
-                                            gt_pasts=gt_pasts,
-                                            gt_bboxes=gt_bboxes,
-                                            device=device,
-                                            return_loss=return_loss)
-            log_vars.update(summary)
-            self.log_update(log)
-
-
-            forecast_loss, summary, log = self.tsup.supervise_forecast(tp_det_idx=tp_det_idx,
-                                                                        tp_gt_idx=tp_gt_idx,
-                                                                        forecast_preds=forecast_preds,
-                                                                        gt_futures=gt_futures,
-                                                                        device=device,
-                                                                        log_prefix='track_',
-                                                                        return_loss=return_loss)
-            log_vars.update(summary)
-            self.log_update(log)
-
-            losses = refine_loss + forecast_loss
-        
-        #get track outputs for this step
-        # det_indices = torch.arange(0,len(self.tracks) ,dtype=torch.long,device=device)
-        trk_id_preds, score_preds, bbox_preds, cls_preds = self.get_global_track_id_preds(self.activeTracks,device=device,output_preds=output_preds)
-        return trackCount, log_vars, losses, (trk_id_preds, score_preds, bbox_preds, cls_preds,)

@@ -170,6 +170,8 @@ class Track(nn.Module):
             future = np.concatenate([future,[0]])[np.newaxis,:]
             xyz_d = det_temp[:3] + future
             xyz_r = refined_temp[:3] + future
+        else:
+            raise ValueError('propagation_method must be either "future" or "velocity", got {}'.format(propagation_method))
 
 
         xyz = np.concatenate([xyz_d[np.newaxis,:],xyz_r[np.newaxis,:]],axis=0)

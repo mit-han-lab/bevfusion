@@ -11,11 +11,277 @@ from mmcv import Config
 from mmdet3d.utils import recursive_eval
 from torchpack.utils.config import configs
 
+from mmdet3d.ops.iou3d.iou3d_utils import nms_gpu
 import torch
 import torch.nn.functional as F
+from mmdet3d.core import (
+    PseudoSampler,
+    circle_nms,
+    draw_heatmap_gaussian,
+    gaussian_radius,
+    xywhr2xyxyr,
+)
+
 from mmdet.core import (
+    AssignResult,
+    build_assigner,
+    build_bbox_coder,
+    build_sampler,
     multi_apply,
 )
+
+# modify decode to return masked queries
+def decode(self, heatmap, rot, dim, center, height, vel, filter=False, queries=None):
+    """Decode bboxes.
+    Args:
+        heat (torch.Tensor): Heatmap with the shape of [B, num_cls, num_proposals].
+        rot (torch.Tensor): Rotation with the shape of
+            [B, 1, num_proposals].
+        dim (torch.Tensor): Dim of the boxes with the shape of
+            [B, 3, num_proposals].
+        center (torch.Tensor): bev center of the boxes with the shape of
+            [B, 2, num_proposals]. (in feature map metric)
+        hieght (torch.Tensor): height of the boxes with the shape of
+            [B, 2, num_proposals]. (in real world metric)
+        vel (torch.Tensor): Velocity with the shape of [B, 2, num_proposals].
+        filter: if False, return all box without checking score and center_range
+    Returns:
+        list[dict]: Decoded boxes.
+    """
+    # class label
+    final_preds = heatmap.max(1, keepdims=False).indices
+    final_scores = heatmap.max(1, keepdims=False).values
+
+    # change size to real world metric
+    center[:, 0, :] = center[:, 0, :] * self.out_size_factor * self.voxel_size[0] + self.pc_range[0]
+    center[:, 1, :] = center[:, 1, :] * self.out_size_factor * self.voxel_size[1] + self.pc_range[1]
+    # center[:, 2, :] = center[:, 2, :] * (self.post_center_range[5] - self.post_center_range[2]) + self.post_center_range[2]
+    dim[:, 0, :] = dim[:, 0, :].exp()
+    dim[:, 1, :] = dim[:, 1, :].exp()
+    dim[:, 2, :] = dim[:, 2, :].exp()
+    height = height - dim[:, 2:3, :] * 0.5  # gravity center to bottom center
+    rots, rotc = rot[:, 0:1, :], rot[:, 1:2, :]
+    rot = torch.atan2(rots, rotc)
+
+    if vel is None:
+        final_box_preds = torch.cat([center, height, dim, rot], dim=1).permute(0, 2, 1)
+    else:
+        final_box_preds = torch.cat([center, height, dim, rot, vel], dim=1).permute(0, 2, 1)
+
+    predictions_dicts = []
+    for i in range(heatmap.shape[0]):
+        boxes3d = final_box_preds[i]
+        scores = final_scores[i]
+        labels = final_preds[i]
+        predictions_dict = {
+            'bboxes': boxes3d,
+            'scores': scores,
+            'labels': labels
+        }
+        predictions_dicts.append(predictions_dict)
+
+    if filter is False:
+        return predictions_dicts
+
+    # use score threshold
+    if self.score_threshold is not None:
+        thresh_mask = final_scores > self.score_threshold
+
+    if self.post_center_range is not None:
+        self.post_center_range = torch.tensor(
+            self.post_center_range, device=heatmap.device)
+        mask = (final_box_preds[..., :3] >=
+                self.post_center_range[:3]).all(2)
+        mask &= (final_box_preds[..., :3] <=
+                    self.post_center_range[3:]).all(2)
+
+        predictions_dicts = []
+        for i in range(heatmap.shape[0]):
+            cmask = mask[i, :]
+            if self.score_threshold:
+                cmask &= thresh_mask[i]
+
+            boxes3d = final_box_preds[i, cmask]
+            scores = final_scores[i, cmask]
+            labels = final_preds[i, cmask]
+            predictions_dict = {
+                'bboxes': boxes3d,
+                'scores': scores,
+                'labels': labels
+            }
+
+            if queries is not None:
+                # print('in decode',queries[i].shape)
+                queries[i] = queries[i][:,:,cmask]
+                # print('in decode after',queries[i].shape)
+
+            predictions_dicts.append(predictions_dict)
+    else:
+        raise NotImplementedError(
+            'Need to reorganize output as a batch, only '
+            'support post_center_range is not None for now!')
+
+    if queries is not None:
+        return predictions_dicts, queries
+    else:
+        return predictions_dicts
+
+
+def get_bboxes_head(self, preds_dicts, metas, img=None, rescale=False, for_roi=False, queries=None):
+    """Generate bboxes from bbox head predictions.
+    Args:
+        preds_dicts (tuple[list[dict]]): Prediction results.
+    Returns:
+        list[list[dict]]: Decoded bbox, scores and labels for each layer & each batch
+    """
+    rets = []
+    for layer_id, preds_dict in enumerate(preds_dicts):
+        batch_size = preds_dict[0]["heatmap"].shape[0]
+        batch_score = preds_dict[0]["heatmap"][..., -self.num_proposals :].sigmoid()
+        # if self.loss_iou.loss_weight != 0:
+        #    batch_score = torch.sqrt(batch_score * preds_dict[0]['iou'][..., -self.num_proposals:].sigmoid())
+        one_hot = F.one_hot(
+            self.query_labels, num_classes=self.num_classes
+        ).permute(0, 2, 1)
+        batch_score = batch_score * preds_dict[0]["query_heatmap_score"] * one_hot
+
+        batch_center = preds_dict[0]["center"][..., -self.num_proposals :]
+        batch_height = preds_dict[0]["height"][..., -self.num_proposals :]
+        batch_dim = preds_dict[0]["dim"][..., -self.num_proposals :]
+        batch_rot = preds_dict[0]["rot"][..., -self.num_proposals :]
+        batch_vel = None
+        if "vel" in preds_dict[0]:
+            batch_vel = preds_dict[0]["vel"][..., -self.num_proposals :]
+
+        # print('in get bboxes',batch_score.shape)
+        temp = self.bbox_coder.decode(
+            batch_score,
+            batch_rot,
+            batch_dim,
+            batch_center,
+            batch_height,
+            batch_vel,
+            filter=True,
+            queries=queries,
+        )
+
+        if queries is not None:
+            temp, queries = temp
+
+
+        if self.test_cfg["dataset"] == "nuScenes":
+            self.tasks = [
+                dict(
+                    num_class=8,
+                    class_names=[],
+                    indices=[0, 1, 2, 3, 4, 5, 6, 7],
+                    radius=-1,
+                ),
+                dict(
+                    num_class=1,
+                    class_names=["pedestrian"],
+                    indices=[8],
+                    radius=0.175,
+                ),
+                dict(
+                    num_class=1,
+                    class_names=["traffic_cone"],
+                    indices=[9],
+                    radius=0.175,
+                ),
+            ]
+        elif self.test_cfg["dataset"] == "Waymo":
+            self.tasks = [
+                dict(num_class=1, class_names=["Car"], indices=[0], radius=0.7),
+                dict(
+                    num_class=1, class_names=["Pedestrian"], indices=[1], radius=0.7
+                ),
+                dict(num_class=1, class_names=["Cyclist"], indices=[2], radius=0.7),
+            ]
+
+        ret_layer = []
+        for i in range(batch_size):
+            boxes3d = temp[i]["bboxes"]
+            scores = temp[i]["scores"]
+            labels = temp[i]["labels"]
+            # print('in get bboxes bboxes shape:',boxes3d.shape)
+            ## adopt circle nms for different categories
+            if self.test_cfg["nms_type"] != None:
+                keep_mask = torch.zeros_like(scores)
+                for task in self.tasks:
+                    task_mask = torch.zeros_like(scores)
+                    for cls_idx in task["indices"]:
+                        task_mask += labels == cls_idx
+                    task_mask = task_mask.bool()
+                    if task["radius"] > 0:
+                        if self.test_cfg["nms_type"] == "circle":
+                            boxes_for_nms = torch.cat(
+                                [
+                                    boxes3d[task_mask][:, :2],
+                                    scores[:, None][task_mask],
+                                ],
+                                dim=1,
+                            )
+                            task_keep_indices = torch.tensor(
+                                circle_nms(
+                                    boxes_for_nms.detach().cpu().numpy(),
+                                    task["radius"],
+                                )
+                            )
+                        else:
+                            boxes_for_nms = xywhr2xyxyr(
+                                metas[i]["box_type_3d"](
+                                    boxes3d[task_mask][:, :7], 7
+                                ).bev
+                            )
+                            top_scores = scores[task_mask]
+                            task_keep_indices = nms_gpu(
+                                boxes_for_nms,
+                                top_scores,
+                                thresh=task["radius"],
+                                pre_maxsize=self.test_cfg["pre_maxsize"],
+                                post_max_size=self.test_cfg["post_maxsize"],
+                            )
+                    else:
+                        task_keep_indices = torch.arange(task_mask.sum())
+                        
+                    if task_keep_indices.shape[0] != 0:
+                        keep_indices = torch.where(task_mask != 0)[0][
+                            task_keep_indices
+                        ]
+                        keep_mask[keep_indices] = 1
+
+
+                keep_mask = keep_mask.bool()
+                ret = dict(
+                    bboxes=boxes3d[keep_mask],
+                    scores=scores[keep_mask],
+                    labels=labels[keep_mask],
+                )
+                if queries is not None:
+                    # print('getbboxes_shapes',queries[i].shape, keep_mask.shape)
+                    queries[i] = queries[i][:,:,keep_mask]
+                
+            else:  # no nms
+                ret = dict(bboxes=boxes3d, scores=scores, labels=labels)
+            ret_layer.append(ret)
+        rets.append(ret_layer)
+    assert len(rets) == 1
+    assert len(rets[0]) == 1
+    res = [
+        [
+            metas[0]["box_type_3d"](
+                rets[0][0]["bboxes"], box_dim=rets[0][0]["bboxes"].shape[-1]
+            ),
+            rets[0][0]["scores"],
+            rets[0][0]["labels"].int(),
+        ]
+    ]
+
+    if queries is not None:
+        return res, queries
+    else:
+        return res
 
 def forward_single_head(self, inputs, img_inputs, metas):
     """Forward function for CenterPoint.
@@ -233,7 +499,11 @@ def forward_single(
         for type, head in self.heads.items():
             if type == "object":
                 pred_dict, queries = head(x, metas)
-                bboxes = head.get_bboxes(pred_dict, metas)
+                # print(pred_dict)
+                # print()
+                # print('before get_bboxes',[{k:v.shape for k,v in d.items()} for d in pred_dict[0]])
+                bboxes, queries = head.get_bboxes(pred_dict, metas, queries=queries)
+                # print('after get_bboxes',[(boxes.tensor.shape, scores.shape, labels.shape) for boxes, scores, labels in bboxes])
                 for k, (boxes, scores, labels) in enumerate(bboxes):
                     outputs[k].update(
                         {
@@ -306,21 +576,12 @@ def forward_head(self, feats, metas):
 def load_pretrained_detector(config,loadpath,test=False,cfg_type='torchpack'):
     """ Load pretrained cetnerpoint and modify its runtime behaviour"""
     detector = load_pretrained_model(config=config,loadpath=loadpath,test=test,cfg_type=cfg_type)
-
+    
+    detector.heads['object'].bbox_coder.decode = types.MethodType(decode,detector.heads['object'].bbox_coder)
+    detector.heads['object'].get_bboxes = types.MethodType(get_bboxes_head,detector.heads['object'])
     detector.heads['object'].forward_single = types.MethodType(forward_single_head,detector.heads['object'])
     detector.heads['object'].forward = types.MethodType(forward_head,detector.heads['object'])
     detector.forward_single = types.MethodType(forward_single,detector)
-    # centerpoint.forward_pts_train = types.MethodType(forward_pts_train,centerpoint)
-    # centerpoint.forward_img_train = types.MethodType(forward_img_train,centerpoint)
-    # centerpoint.simple_test_pts = types.MethodType(simple_test_pts,centerpoint)
-    # centerpoint.simple_test = types.MethodType(simple_test,centerpoint)
-    # centerpoint.extract_pts_feat = types.MethodType(extract_pts_feat,centerpoint)
-    # centerpoint.extract_feat = types.MethodType(extract_feat,centerpoint)
     detector.forward_detector_tracking = types.MethodType(forward_detector_tracking,detector)
-
-    # centerpoint.pts_bbox_head.get_bboxes = types.MethodType(
-    #         get_bboxes,centerpoint.pts_bbox_head)
-    # centerpoint.pts_bbox_head.bbox_coder.decode = types.MethodType(
-    #         decode,centerpoint.pts_bbox_head.bbox_coder)
 
     return detector

@@ -28,7 +28,25 @@ from mmdet3d.core.bbox import LiDARInstance3DBoxes
 
 from .bevfusion_modif import load_pretrained_detector
 
+def confidence_score_filter(bbox_list,queries,threshold=0.01):
+    if threshold == 0:
+        return bbox_list,queries
 
+    #filter out predictions with low confidence
+    for i in range(len(bbox_list)):
+        scores = bbox_list[i][1]
+        mask = torch.where(scores > threshold)[0]
+
+        # print("\nconfidence_score_filter: keeping {}/{} predictions".format((scores > threshold).sum(),len(scores)))
+        # print("\nscores:{}, mask:{}".format(scores.shape,mask.shape))
+        bbox_list[i][0].tensor = bbox_list[i][0].tensor[mask,...] 
+        bbox_list[i][1] = bbox_list[i][1][mask] 
+        bbox_list[i][2] = bbox_list[i][2][mask]
+        queries[i] = queries[i][mask,...]
+        
+    # print([[a.tensor.shape,b.shape,c.shape] for a,b,c in bbox_list])
+
+    return bbox_list,queries
 
 @FUSIONMODELS.register_module()
 class CenterPointTracker(Base3DDetector):
@@ -40,7 +58,8 @@ class CenterPointTracker(Base3DDetector):
                  load_detector_from, 
                  pretrained_config,
                  bev_supervisor,
-                 trk_manager, 
+                 trk_manager,
+                 confidence_threshold=0.01,
                  compute_loss_det=False,
                  test_output_config={'bbox':'track', 'score':'det'}, # 'gt' for ground truth
                  verbose=False,
@@ -59,6 +78,7 @@ class CenterPointTracker(Base3DDetector):
             compute_loss_det (bool): Whether to compute the loss of the detector or not.
         """
         super(CenterPointTracker, self).__init__()
+        self.confidence_threshold = confidence_threshold
         pretrained_config = 'configs/nuscenes/det/transfusion/secfpn/camera+lidar/swint_v0p075/convfuser.yaml'
         load_detector_from = 'pretrained/bevfusion-det.pth'
         self.detector = load_pretrained_detector(config=pretrained_config,
@@ -356,6 +376,12 @@ class CenterPointTracker(Base3DDetector):
 
         bbox_list = [[x['boxes_3d'],x['scores_3d'],x['labels_3d']] for x in bbox_list]
         queries = [x.squeeze(0).t() for x in queries]
+
+        bbox_list, queries = confidence_score_filter(bbox_list,queries,threshold=self.confidence_threshold)
+
+        
+
+
         
         if self.compute_loss_det:
             loss_dict.update(losses)
@@ -519,6 +545,8 @@ class CenterPointTracker(Base3DDetector):
                                                     **kwargs)
         bbox_list = [[x['boxes_3d'],x['scores_3d'],x['labels_3d']] for x in bbox_list]
         queries = [x.squeeze(0).t() for x in queries]
+
+        bbox_list, queries = confidence_score_filter(bbox_list,queries,threshold=self.confidence_threshold)
 
         # print(bbox_list[0][0])
         # exit(0)

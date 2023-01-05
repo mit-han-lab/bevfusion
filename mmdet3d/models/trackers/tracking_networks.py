@@ -116,7 +116,8 @@ class TrackingModules(nn.Module):
                  decisions,
                  #EdgeGNN
                  edge_gnn,
-                 decision_edge_linear):
+                 decision_edge_linear,
+                 synthetic_query):
         super().__init__()
         
         #Feature Ecoders
@@ -186,6 +187,8 @@ class TrackingModules(nn.Module):
         #Edge GNN
         self.edge_gnn = build_module(edge_gnn)
         self.decision_edge_linear = build_module(decision_edge_linear)
+
+        self.synthetic_query = build_module(synthetic_query)
 
 
 
@@ -449,7 +452,8 @@ class DecisionTracker(TrackingModules):
         trk_feats = trk_feats.unsqueeze(1)
         det_feats = det_feats.unsqueeze(1)
 
-        assert trk_feats.shape[1:] == det_feats.shape[1:]
+
+        assert trk_feats.shape[1:] == det_feats.shape[1:], "Track and detection features must have the same shape, but got {} and {}".format(trk_feats.shape[1:],det_feats.shape[1:])
 
         #get the features of matched dets
         #pad tracks
