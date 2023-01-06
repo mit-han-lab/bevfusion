@@ -140,6 +140,8 @@ class CustomEval(Hook):
             
             print('before dist barrier')
             dist.barrier()
+
+        print('after dist barrier, rank:',rank)
      
 
 
@@ -244,10 +246,13 @@ def multi_gpu_test(model, data_loader, tmpdir=None, gpu_collect=False):
         # if i > 100: 
         #     break
 
-    print("Exiting for in multi_gpu_test")
+
+    dist.barrier()
+
     # collect results from all ranks
     if gpu_collect:
         results = collect_results_gpu(results, len(dataset))
+        dist.barrier()
         all_log_vars = collect_results_gpu(all_log_vars, len(dataset))
     else:
         results = collect_results_cpu(results, len(dataset), tmpdir)
@@ -258,11 +263,14 @@ def multi_gpu_test(model, data_loader, tmpdir=None, gpu_collect=False):
 
 
 def collect_results_gpu(result_part, size):
-    print("Entering collect_results_gpu")
     rank, world_size = get_dist_info()
+
+    # print(result_part)
     # dump result part to tensor with pickle
-    part_tensor = torch.tensor(
-        bytearray(pickle.dumps(result_part)), dtype=torch.uint8, device='cuda')
+
+    b = bytearray(pickle.dumps(result_part))
+    part_tensor = torch.tensor(b, dtype=torch.uint8, device='cuda')
+    # part_tensor = torch.tensor(bytearray(pickle.dumps(result_part)), dtype=torch.uint8, device='cuda')
     # gather all result part tensor shape
     shape_tensor = torch.tensor(part_tensor.shape, device='cuda')
     shape_list = [shape_tensor.clone() for _ in range(world_size)]
@@ -291,8 +299,8 @@ def collect_results_gpu(result_part, size):
         # the dataloader may pad some samples
         # ordered_results = ordered_results[:size]
 
-        print("Exiting collect_results_gpu")
         return ordered_results
+
 
 
 

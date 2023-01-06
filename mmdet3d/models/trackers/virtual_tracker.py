@@ -22,7 +22,7 @@ from scipy.optimize import linear_sum_assignment
 from pyquaternion import Quaternion
 # from pytorch3d.structures.pointclouds import Pointclouds
 
-from mmdet3d.models.trackers.pc_utils import get_affine_torch, apply_rotation_to_angle, linear_interp_sweeps, interpolate_per_frame
+# from mmdet3d.models.trackers.pc_utils import get_affine_torch, apply_rotation_to_angle, linear_interp_sweeps, interpolate_per_frame
 
 
 
@@ -450,6 +450,14 @@ class VirtualTracker(nn.Module):
             t1 = time.time()
             import timeit
 
+
+            ts1 = ego.get_timestamp(-2)
+            ts2 = ego.get_timestamp(-1) / 1e6
+
+            if ts1 is None:
+                ts1 = ts2 - 0.5
+            else:
+                ts1 = ts1/1e6
 
 
             

@@ -37,7 +37,7 @@ def confidence_score_filter(bbox_list,queries,threshold=0.01):
         scores = bbox_list[i][1]
         mask = torch.where(scores > threshold)[0]
 
-        # print("\nconfidence_score_filter: keeping {}/{} predictions".format((scores > threshold).sum(),len(scores)))
+        print("\nconfidence_score_filter: keeping {}/{} predictions".format((scores > threshold).sum(),len(scores)))
         # print("\nscores:{}, mask:{}".format(scores.shape,mask.shape))
         bbox_list[i][0].tensor = bbox_list[i][0].tensor[mask,...] 
         bbox_list[i][1] = bbox_list[i][1][mask] 
@@ -280,6 +280,7 @@ class CenterPointTracker(Base3DDetector):
                       lidar2ego_rotation=None,
                       ego2global_translation=None,
                       ego2global_rotation=None,
+                      timestamp=None,
                       **kwargs):
         """Forward training function.
 
@@ -343,6 +344,7 @@ class CenterPointTracker(Base3DDetector):
             'lidar2ego_rotation':lidar2ego_rotation,
             'ego_translation':ego_translation,
             'ego_orientation':ego_orientation,
+            'timestamp':[x['timestamp'] for x in metas],
         }
 
         gt_tracks = [x.long().to(device) for x in gt_tracks]
@@ -492,6 +494,7 @@ class CenterPointTracker(Base3DDetector):
                       lidar2ego_rotation=None,
                       ego2global_translation=None,
                       ego2global_rotation=None,
+                      timestamp=None,
                       padded=None,
                       **kwargs):
         """Test function without augmentaiton for tracking."""
@@ -519,6 +522,7 @@ class CenterPointTracker(Base3DDetector):
             'lidar2ego_rotation':lidar2ego_rotation,
             'ego_translation':ego_translation,
             'ego_orientation':ego_orientation,
+            'timestamp':[x['timestamp'] for x in metas],
         }
 
         gt_tracks = [x.long().to(device) for x in gt_tracks]

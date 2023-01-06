@@ -1,6 +1,6 @@
 _base_ = [
     '../_base_/tracking_runtime.py',
-    '../_base_/datasets/nus-mini-3d-tracking-bevfusion.py',
+    '../_base_/datasets/nus-medium-3d-tracking-bevfusion.py',
     '../_base_/trackers/pnp_net_256_lstm_residual_transformer-0-2-8_decisions_cls_emb.py',
     '../_base_/schedules/cyclic_tracking_30e_accum2.py'
 ]

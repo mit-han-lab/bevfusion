@@ -170,6 +170,10 @@ torchpack dist-run -np 2 python tools/train.py configs_tracking/centerpoint/cent
 torchpack dist-run -np 2 python tools/train.py configs_tracking/centerpoint/centerpoint_decision_tracker_nus-medium_30e_256_0-2_residual_focal_w45_g2_TF_all_bevfusion.py
 
 CUDA_VISIBLE_DEVICES=0,1 MASTER_ADDR=localhost torchpack dist-run -v -np 2 python tools/train.py configs_tracking/centerpoint/centerpoint_decision_tracker_nus-medium_30e_256_0-2_residual_focal_w45_g2_TF_all_bevfusion_query.py
+
+
+
+CUDA_VISIBLE_DEVICES=0,1 MASTER_ADDR=localhost torchpack dist-run -v -np 2 python tools/train.py configs_tracking/centerpoint/centerpoint_decision_tracker_nus-medium_30e_256_0-2_residual_focal_w45_g2_TF_all_bevfusion.py
 ```
 
 

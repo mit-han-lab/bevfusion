@@ -206,9 +206,6 @@ class NuScenesDataset_tracking(NuScenesDataset):
             # exit(0)
             gt_pasts = np.array([])
         
-
-
-        
         # print(info)
         # for k,v in info.items():
         #     print(k)

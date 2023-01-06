@@ -39,6 +39,7 @@ class EgoVehicle:
         self.o_velocity = None
         self.l2et = None
         self.l2er = None
+        self.timestamp = None
 
     def __init__(self):
         super().__init__()
@@ -54,11 +55,12 @@ class EgoVehicle:
         del self.o_velocity
         del self.l2et
         del self.l2er
+        del self.timestamp
         self.init_attributes()
 
 
     def add_timestep(self,ego_orientation,ego_translation,lidar2ego_translation,lidar2ego_rotation,
-                     ego2global_translation,ego2global_rotation,device):
+                     ego2global_translation,ego2global_rotation,timestamp,device):
         """ Adds the orientation and position of ego for the current timestep
 
         args:
@@ -66,6 +68,7 @@ class EgoVehicle:
             orientation [Quaternion] : current orientation of the ego
         """
         if self.position == None: 
+            self.timestamp = [timestamp]
             self.orientation = [ego_orientation]
             self.yaw = [torch.tensor(quaternion_yaw(ego_orientation),dtype=torch.float32,device=device)]
             self.yaw_feat = [torch.tensor([torch.sin(self.yaw[-1]),torch.cos(self.yaw[-1])],dtype=torch.float32,device=device)]
@@ -77,6 +80,7 @@ class EgoVehicle:
             self.e2gt = [ego2global_translation.cpu().numpy()]
             self.e2gr = [ego2global_rotation.cpu().numpy()]
         else:
+            self.timestamp.append(timestamp)
             self.orientation.append(ego_orientation)
             self.yaw.append(torch.tensor(quaternion_yaw(ego_orientation),dtype=torch.float32,device=device))
             self.yaw_feat.append(torch.tensor([torch.sin(self.yaw[-1]),torch.cos(self.yaw[-1])],dtype=torch.float32,device=device))
@@ -136,6 +140,12 @@ class EgoVehicle:
 
         return apply_transform(global2lidar @ lidar2global, points)
 
+    def get_timestamp(self,idx):
+        """Returns the timestamp of the current timestep"""
+        try:
+            return self.timestamp[idx]
+        except IndexError:
+            return None
 
     def get_current_feat(self):
         """Returns the features of the ego for the current timestep"""
@@ -282,7 +292,7 @@ class TrackingManager(nn.Module):
     
     
     def addDetection(self,net,points,queries,pts_feats,bbox_list,img_metas,first_in_scene,last_in_scene,ego_update,
-                     gt_labels,gt_bboxes,gt_tracks,device,gt_futures, gt_pasts,gt_track_tte,
+                     gt_labels,gt_bboxes,gt_tracks,device,gt_futures, gt_pasts,gt_track_tte, 
                      output_preds=False,return_loss=True,
                      ):
         """ Adds the detections from the current timestep.

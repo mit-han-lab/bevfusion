@@ -55,6 +55,7 @@ def linear_interp_sweeps(sweeps_ts,xy1,xy2,ts1,ts2,device='cpu'):
 
 
 def interpolate_per_frame(ts1,ts2,bboxes,offset,sweeps_infos,pts_sweeps,device):
+    """Interpolates bounding boxes over sweeps and ls"""
     assert len(sweeps_infos) == 10
     assert bboxes.dtype == torch.float32
     assert pts_sweeps[0].dtype == torch.float32
