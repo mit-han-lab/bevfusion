@@ -11,6 +11,7 @@
 
 **If you are interested in getting updates, please sign up [here](https://docs.google.com/forms/d/e/1FAIpQLSfkmfsX45HstL5rUQlS7xJthhS3Z_Pm2NOVstlXUqgaK4DEfQ/viewform) to get notified!**
 
+- **(2023/1/16)** BEVFusion is accepted to ICRA 2023!
 - **(2022/8/16)** BEVFusion ranks first on [Waymo](https://waymo.com/open/challenges/2020/3d-detection/) 3D object detection leaderboard among all solutions.
 - **(2022/6/3)** BEVFusion ranks first on [nuScenes](https://nuscenes.org/object-detection?externalData=all&mapData=all&modalities=Any) among all solutions.
 - **(2022/6/3)** We released the first version of BEVFusion (with pre-trained checkpoints and evaluation).
@@ -213,10 +214,10 @@ Please also check out related papers in the camera-only 3D perception community 
 If BEVFusion is useful or relevant to your research, please kindly recognize our contributions by citing our paper:
 
 ```bibtex
-@article{liu2022bevfusion,
+@inproceedings{liu2022bevfusion,
   title={BEVFusion: Multi-Task Multi-Sensor Fusion with Unified Bird's-Eye View Representation},
   author={Liu, Zhijian and Tang, Haotian and Amini, Alexander and Yang, Xingyu and Mao, Huizi and Rus, Daniela and Han, Song},
-  journal={arXiv},
-  year={2022}
+  booktitle={IEEE International Conference on Robotics and Automation (ICRA)},
+  year={2023}
 }
 ```
