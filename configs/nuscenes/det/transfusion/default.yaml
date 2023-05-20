@@ -2,6 +2,8 @@ model:
   heads:
     object:
       type: TransFusionHead
+      dequity_eta: 1.0
+      dequity_gamma: 5.0
       num_proposals: 200
       auxiliary: true
       in_channels: null

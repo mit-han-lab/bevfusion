@@ -2,6 +2,7 @@ import os
 from collections import OrderedDict
 from os import path as osp
 from typing import List, Tuple, Union
+import pickle
 
 import mmcv
 import numpy as np
@@ -40,7 +41,7 @@ nus_attributes = (
 
 
 def create_nuscenes_infos(
-    root_path, info_prefix, version="v1.0-trainval", max_sweeps=10
+    root_path, info_prefix, version="v1.0-trainval", max_sweeps=10, out_dir=None, capture_likelihood=False, cluster_info_path=None,
 ):
     """Create info file of nuscene dataset.
 
@@ -95,16 +96,26 @@ def create_nuscenes_infos(
         print(
             "train scene: {}, val scene: {}".format(len(train_scenes), len(val_scenes))
         )
-    train_nusc_infos, val_nusc_infos = _fill_trainval_infos(
-        nusc, train_scenes, val_scenes, test, max_sweeps=max_sweeps
-    )
+    # train_nusc_infos, val_nusc_infos = _fill_trainval_infos(
+    #     nusc, train_scenes, val_scenes, test, max_sweeps=max_sweeps
+    # )
 
+    train_nusc_infos, val_nusc_infos = _fill_trainval_infos(
+        nusc=nusc, 
+        train_scenes=train_scenes, 
+        val_scenes=val_scenes, 
+        capture_likelihood=capture_likelihood, 
+        cluster_info_path=cluster_info_path,
+        test=test, 
+        max_sweeps=max_sweeps
+    )
+    
     metadata = dict(version=version)
     if test:
         print("test sample: {}".format(len(train_nusc_infos)))
         data = dict(infos=train_nusc_infos, metadata=metadata)
-        info_path = osp.join(root_path, "{}_infos_test.pkl".format(info_prefix))
-        mmcv.dump(data, info_path)
+        info_test_path = osp.join(out_dir, "{}_infos_test.pkl".format(info_prefix))
+        mmcv.dump(data, info_test_path)
     else:
         print(
             "train sample: {}, val sample: {}".format(
@@ -112,12 +123,13 @@ def create_nuscenes_infos(
             )
         )
         data = dict(infos=train_nusc_infos, metadata=metadata)
-        info_path = osp.join(root_path, "{}_infos_train.pkl".format(info_prefix))
-        mmcv.dump(data, info_path)
+        info_train_path = osp.join(out_dir, "{}_infos_train.pkl".format(info_prefix))
+        mmcv.dump(data, info_train_path)
+        print("nuscenes_converter/Dumped, ", info_train_path)
         data["infos"] = val_nusc_infos
-        info_val_path = osp.join(root_path, "{}_infos_val.pkl".format(info_prefix))
+        info_val_path = osp.join(out_dir, "{}_infos_val.pkl".format(info_prefix))
+        print("nuscenes_converter/Dumped, ", info_val_path)
         mmcv.dump(data, info_val_path)
-
 
 def get_available_scenes(nusc):
     """Get available scenes from the input nuscenes class.
@@ -160,7 +172,7 @@ def get_available_scenes(nusc):
     return available_scenes
 
 
-def _fill_trainval_infos(nusc, train_scenes, val_scenes, test=False, max_sweeps=10):
+def _fill_trainval_infos(nusc, train_scenes, val_scenes, capture_likelihood=False, cluster_info_path=None, test=False, max_sweeps=10):
     """Generate the train/val infos from the raw data.
 
     Args:
@@ -175,6 +187,13 @@ def _fill_trainval_infos(nusc, train_scenes, val_scenes, test=False, max_sweeps=
         tuple[list[dict]]: Information of training set and validation set
             that will be saved to the info file.
     """
+    # Add dq
+    cluster_info = {}
+    if capture_likelihood and cluster_info_path is not None:
+        # load cluster info pickle file
+        with open(cluster_info_path, 'rb') as f:
+            cluster_info = pickle.load(f)
+
     train_nusc_infos = []
     val_nusc_infos = []
 
@@ -202,6 +221,11 @@ def _fill_trainval_infos(nusc, train_scenes, val_scenes, test=False, max_sweeps=
             "timestamp": sample["timestamp"],
             "location": location,
         }
+
+        # add sample cluster info to the info dictionary
+        if sample['token'] in cluster_info:
+            sample_cluster_info = cluster_info[sample['token']]
+            info['cluster_info'] = sample_cluster_info
 
         l2e_r = info["lidar2ego_rotation"]
         l2e_t = info["lidar2ego_translation"]

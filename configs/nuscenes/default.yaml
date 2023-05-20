@@ -1,5 +1,6 @@
 dataset_type: NuScenesDataset
-dataset_root: data/nuscenes/
+dataset_root: /s/dat/UserFolders/xzhan258/bevfusion/data/nuscenes/
+dataset_info: /s/dat/UserFolders/xzhan258/bevfusion/data/full/nuscenes_infos/
 gt_paste_stop_epoch: -1
 reduce_beams: 32
 load_dim: 5
@@ -174,6 +175,7 @@ train_pipeline:
       - gt_bboxes_3d
       - gt_labels_3d
       - gt_masks_bev
+      - sample_likelihood
     meta_keys:
       - camera_intrinsics
       - camera2ego
@@ -265,7 +267,7 @@ data:
     dataset:
       type: ${dataset_type}
       dataset_root: ${dataset_root}
-      ann_file: ${dataset_root + "nuscenes_infos_train.pkl"}
+      ann_file: ${dataset_info + "nuscenes_infos_train.pkl"}
       pipeline: ${train_pipeline}
       object_classes: ${object_classes}
       map_classes: ${map_classes}
@@ -273,10 +275,11 @@ data:
       test_mode: false
       use_valid_flag: true
       box_type_3d: LiDAR
+      dataset_equity: true
   val:
     type: ${dataset_type}
     dataset_root: ${dataset_root}
-    ann_file: ${dataset_root + "nuscenes_infos_val.pkl"}
+    ann_file: ${dataset_info + "nuscenes_infos_val.pkl"}
     pipeline: ${test_pipeline}
     object_classes: ${object_classes}
     map_classes: ${map_classes}
@@ -286,7 +289,7 @@ data:
   test:
     type: ${dataset_type}
     dataset_root: ${dataset_root}
-    ann_file: ${dataset_root + "nuscenes_infos_val.pkl"}
+    ann_file: ${dataset_info + "nuscenes_infos_val.pkl"}
     pipeline: ${test_pipeline}
     object_classes: ${object_classes}
     map_classes: ${map_classes}
@@ -295,6 +298,10 @@ data:
     box_type_3d: LiDAR
 
 evaluation:
+  type: NDSEvalHook
   interval: 1
+  start: 1
+  save_best: NDS
+  rule: greater
   pipeline: ${test_pipeline}
- 
+  

@@ -176,6 +176,7 @@ class BEVFusion(Base3DFusionModel):
         img_aug_matrix,
         lidar_aug_matrix,
         metas,
+        sample_likelihood=None,
         gt_masks_bev=None,
         gt_bboxes_3d=None,
         gt_labels_3d=None,
@@ -196,6 +197,7 @@ class BEVFusion(Base3DFusionModel):
                 img_aug_matrix,
                 lidar_aug_matrix,
                 metas,
+                sample_likelihood,
                 gt_masks_bev,
                 gt_bboxes_3d,
                 gt_labels_3d,
@@ -217,6 +219,7 @@ class BEVFusion(Base3DFusionModel):
         img_aug_matrix,
         lidar_aug_matrix,
         metas,
+        sample_likelihood,
         gt_masks_bev=None,
         gt_bboxes_3d=None,
         gt_labels_3d=None,
@@ -266,7 +269,9 @@ class BEVFusion(Base3DFusionModel):
             for type, head in self.heads.items():
                 if type == "object":
                     pred_dict = head(x, metas)
-                    losses = head.loss(gt_bboxes_3d, gt_labels_3d, pred_dict)
+                    loss_inputs = [gt_bboxes_3d, gt_labels_3d, pred_dict, sample_likelihood]
+                    #losses = head.loss(gt_bboxes_3d, gt_labels_3d, pred_dict)
+                    losses = head.loss(*loss_inputs)
                 elif type == "map":
                     losses = head(x, gt_masks_bev)
                 else:

@@ -124,6 +124,9 @@ def create_groundtruth_database(
     coors_range=None,
     with_mask=False,
     load_augmented=None,
+    capture_likelihood=False,
+    cluster_info_path=None,
+
 ):
     """Given the raw data, generate the ground truth database.
 
@@ -147,6 +150,7 @@ def create_groundtruth_database(
             Default: False.
     """
     print(f"Create GT Database of {dataset_class_name}")
+    print("data_path", data_path)
     dataset_cfg = dict(
         type=dataset_class_name, dataset_root=data_path, ann_file=info_path
     )
@@ -253,8 +257,10 @@ def create_groundtruth_database(
 
     if database_save_path is None:
         database_save_path = osp.join(data_path, f"{info_prefix}_gt_database")
+        #database_save_path = osp.join(out_dir, f"{info_prefix}_gt_database")
     if db_info_save_path is None:
         db_info_save_path = osp.join(data_path, f"{info_prefix}_dbinfos_train.pkl")
+        #db_info_save_path = osp.join(out_dir, f"{info_prefix}_dbinfos_train.pkl")
     mmcv.mkdir_or_exist(database_save_path)
     all_db_infos = dict()
     if with_mask:

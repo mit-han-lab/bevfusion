@@ -294,6 +294,8 @@ class CenterHead(BaseModule):
         bias="auto",
         norm_bbox=True,
         init_cfg=None,
+        dequity_eta=1.0,
+        dequity_gamma=5.0,
     ):
         assert init_cfg is None, (
             "To prevent abnormal initialization "
@@ -313,6 +315,10 @@ class CenterHead(BaseModule):
         self.loss_bbox = build_loss(loss_bbox)
         self.bbox_coder = build_bbox_coder(bbox_coder)
         self.num_anchor_per_locs = [n for n in num_classes]
+
+        # add dq loss parameters
+        self.dequity_eta = dequity_eta
+        self.dequity_gamma = dequity_gamma
         self.fp16_enabled = False
 
         # a shared convolution
@@ -335,6 +341,39 @@ class CenterHead(BaseModule):
                 in_channels=share_conv_channel, heads=heads, num_cls=num_cls
             )
             self.task_heads.append(builder.build_head(separate_head))
+
+    def dequity_loss_weight(self, p, eta=1.0, gamma=5.0):
+        """Calculate the dequity loss weight.
+        Args:
+            p (float): The probability of the sample.
+            eta (float): The parameter to control the weight.
+            gamma (float): The parameter to control the weight.
+        Returns:
+            float: The dequity loss weight.
+        """
+        return (eta + (1 - p) ** gamma) / (eta + 1)
+    
+    def dequity_loss_weight_cls(self, p, eta=1.0, gamma=5.0):
+        """Calculate the dequity loss weight.
+        Args:
+            p (float): The probability of the sample.
+            eta (float): The parameter to control the weight.
+            gamma (float): The parameter to control the weight.
+        Returns:
+            float: The dequity loss weight.
+        """
+        return (eta + (1 - p) ** gamma) / (2*(eta + 1))
+    
+    def dequity_loss_weight_bbox(self, p, eta=1.0, gamma=5.0):
+        """Calculate the dequity loss weight.
+        Args:
+            p (float): The probability of the sample.
+            eta (float): The parameter to control the weight.
+            gamma (float): The parameter to control the weight.
+        Returns:
+            float: The dequity loss weight.
+        """
+        return 2*(eta + (1 - p) ** gamma) / (eta + 1)
 
     def forward_single(self, x):
         """Forward function for CenterPoint.
@@ -582,25 +621,47 @@ class CenterHead(BaseModule):
         return heatmaps, anno_boxes, inds, masks
 
     @force_fp32(apply_to=("preds_dicts"))
-    def loss(self, gt_bboxes_3d, gt_labels_3d, preds_dicts, **kwargs):
+    def loss(self, gt_bboxes_3d, gt_labels_3d, preds_dicts, sample_likelihood, **kwargs):
         """Loss function for CenterHead.
         Args:
             gt_bboxes_3d (list[:obj:`LiDARInstance3DBoxes`]): Ground
                 truth gt boxes.
             gt_labels_3d (list[torch.Tensor]): Labels of boxes.
             preds_dicts (dict): Output of forward function.
+            sample_likelihood (list[Tensor]): likelihood for each image
         Returns:
             dict[str:torch.Tensor]: Loss of heatmap and bbox of each task.
         """
         heatmaps, anno_boxes, inds, masks = self.get_targets(gt_bboxes_3d, gt_labels_3d)
         loss_dict = dict()
+
+        # dequity_weights is calculated based on each frame's sample_likelihood
+        dequity_weights = self.dequity_loss_weight(sample_likelihood,
+                                                   eta=self.dequity_eta,
+                                                   gamma=self.dequity_gamma)
+        
+        dequity_weights_bbox = self.dequity_loss_weight_bbox(sample_likelihood,
+                                                   eta=self.dequity_eta,
+                                                   gamma=self.dequity_gamma)
+        
+        dequity_weights_cls = self.dequity_loss_weight_cls(sample_likelihood,
+                                                   eta=self.dequity_eta,
+                                                   gamma=self.dequity_gamma)
+
+        # print("centerpoint/dequity_weights", dequity_weights)
         for task_id, preds_dict in enumerate(preds_dicts):
             # heatmap focal loss
             preds_dict[0]["heatmap"] = clip_sigmoid(preds_dict[0]["heatmap"])
             num_pos = heatmaps[task_id].eq(1).float().sum().item()
-            loss_heatmap = self.loss_cls(
+
+            # multiply with dq weights
+            loss_heatmap = dequity_weights_cls * self.loss_cls(
                 preds_dict[0]["heatmap"], heatmaps[task_id], avg_factor=max(num_pos, 1)
             )
+            # loss_heatmap = self.loss_cls(
+            #     preds_dict[0]["heatmap"], heatmaps[task_id], avg_factor=max(num_pos, 1)
+            # )
+
             target_box = anno_boxes[task_id]
             # reconstruct the anno_box from multiple reg heads
             preds_dict[0]["anno_box"] = torch.cat(
@@ -626,9 +687,12 @@ class CenterHead(BaseModule):
 
             code_weights = self.train_cfg.get("code_weights", None)
             bbox_weights = mask * mask.new_tensor(code_weights)
-            loss_bbox = self.loss_bbox(
+
+
+            loss_bbox = dequity_weights_bbox * self.loss_bbox(
                 pred, target_box, bbox_weights, avg_factor=(num + 1e-4)
             )
+
             loss_dict[f"heatmap/task{task_id}"] = loss_heatmap
             loss_dict[f"bbox/task{task_id}"] = loss_bbox
         return loss_dict

@@ -64,11 +64,17 @@ class TransFusionHead(nn.Module):
         loss_bbox=dict(type="L1Loss", reduction="mean"),
         loss_heatmap=dict(type="GaussianFocalLoss", reduction="mean"),
         # others
+        dequity_eta=1.0,
+        dequity_gamma=5.0,
         train_cfg=None,
         test_cfg=None,
         bbox_coder=None,
     ):
         super(TransFusionHead, self).__init__()
+
+        # add dq parameters
+        self.dequity_eta = dequity_eta
+        self.dequity_gamma = dequity_gamma
 
         self.fp16_enabled = False
 
@@ -169,6 +175,17 @@ class TransFusionHead(nn.Module):
 
         self.img_feat_pos = None
         self.img_feat_collapsed_pos = None
+
+    def dequity_loss_weight(self, p, eta=1.0, gamma=5.0):
+        """Calculate the dequity loss weight.
+        Args:
+            p (float): The probability of the sample.
+            eta (float): The parameter to control the weight.
+            gamma (float): The parameter to control the weight.
+        Returns:
+            float: The dequity loss weight.
+        """
+        return (eta + (1 - p) ** gamma) / (eta + 1)
 
     def create_2D_grid(self, x_size, y_size):
         meshgrid = [[0, x_size - 1, x_size], [0, y_size - 1, y_size]]
@@ -585,13 +602,14 @@ class TransFusionHead(nn.Module):
         )
 
     @force_fp32(apply_to=("preds_dicts"))
-    def loss(self, gt_bboxes_3d, gt_labels_3d, preds_dicts, **kwargs):
+    def loss(self, gt_bboxes_3d, gt_labels_3d, preds_dicts, sample_likelihood, **kwargs):
         """Loss function for CenterHead.
         Args:
             gt_bboxes_3d (list[:obj:`LiDARInstance3DBoxes`]): Ground
                 truth gt boxes.
             gt_labels_3d (list[torch.Tensor]): Labels of boxes.
             preds_dicts (list[list[dict]]): Output of forward function.
+            sample_likelihood (list[Tensor]): likelihood for each image
         Returns:
             dict[str:torch.Tensor]: Loss of heatmap and bbox of each task.
         """
@@ -609,15 +627,45 @@ class TransFusionHead(nn.Module):
             label_weights = label_weights * self.on_the_image_mask
             bbox_weights = bbox_weights * self.on_the_image_mask[:, :, None]
             num_pos = bbox_weights.max(-1).values.sum()
+
+        dequity_weights = self.dequity_loss_weight(sample_likelihood,
+                                           eta=self.dequity_eta,
+                                           gamma=self.dequity_gamma)
+
+        gt_bboxes_list = [torch.cat(
+            (gt_bboxes.gravity_center, gt_bboxes.tensor[:, 3:]),
+            dim=1).to(device) for gt_bboxes in gt_bboxes_3d]
+
+        all_gt_bboxes_list = [gt_bboxes_list for _ in range(self.num_decoder_layers)]
+        all_gt_labels_list = [gt_labels_3d for _ in range(self.num_decoder_layers)]
+
+        # all_gt_bboxes_ignore_list = [
+        #     gt_bboxes_ignore for _ in range(self.num_decoder_layers)
+        # ]
+        all_sample_likelihoods = [sample_likelihoods for _ in range(self.num_decoder_layers)]
+
+        # losses_cls, losses_bbox = multi_apply(
+        #     self.losses, all_cls_scores, all_bbox_preds,
+        #     all_gt_bboxes_list, all_gt_labels_list,
+        #     all_sample_likelihoods, all_gt_bboxes_ignore_list)
+
+
         preds_dict = preds_dicts[0][0]
         loss_dict = dict()
 
         # compute heatmap loss
-        loss_heatmap = self.loss_heatmap(
+        loss_heatmap = dequity_weights * self.loss_heatmap(
             clip_sigmoid(preds_dict["dense_heatmap"]),
             heatmap,
             avg_factor=max(heatmap.eq(1).float().sum().item(), 1),
         )
+
+        # loss_heatmap = self.loss_heatmap(
+        #     clip_sigmoid(preds_dict["dense_heatmap"]),
+        #     heatmap,
+        #     avg_factor=max(heatmap.eq(1).float().sum().item(), 1),
+        # )
+
         loss_dict["loss_heatmap"] = loss_heatmap
 
         # compute loss for each layer
@@ -696,9 +744,14 @@ class TransFusionHead(nn.Module):
                 idx_layer * self.num_proposals : (idx_layer + 1) * self.num_proposals,
                 :,
             ]
-            layer_loss_bbox = self.loss_bbox(
+
+            layer_loss_bbox = dequity_weights * self.loss_bbox(
                 preds, layer_bbox_targets, layer_reg_weights, avg_factor=max(num_pos, 1)
             )
+
+            # layer_loss_bbox = self.loss_bbox(
+            #     preds, layer_bbox_targets, layer_reg_weights, avg_factor=max(num_pos, 1)
+            # )
 
             # layer_iou = preds_dict['iou'][..., idx_layer*self.num_proposals:(idx_layer+1)*self.num_proposals].squeeze(1)
             # layer_iou_target = ious[..., idx_layer*self.num_proposals:(idx_layer+1)*self.num_proposals]

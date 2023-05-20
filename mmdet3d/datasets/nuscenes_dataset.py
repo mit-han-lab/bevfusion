@@ -13,6 +13,7 @@ from mmdet.datasets import DATASETS
 
 from ..core.bbox import LiDARInstance3DBoxes
 from .custom_3d import Custom3DDataset
+import pandas as pd
 
 
 @DATASETS.register_module()
@@ -135,6 +136,7 @@ class NuScenesDataset(Custom3DDataset):
         box_type_3d="LiDAR",
         filter_empty_gt=True,
         test_mode=False,
+        dataset_equity=False,
         eval_version="detection_cvpr_2019",
         use_valid_flag=False,
     ) -> None:
@@ -155,6 +157,8 @@ class NuScenesDataset(Custom3DDataset):
         self.with_velocity = with_velocity
         self.eval_version = eval_version
         from nuscenes.eval.detection.config import config_factory
+
+        self.dataset_equity = dataset_equity
 
         self.eval_detection_configs = config_factory(self.eval_version)
         if self.modality is None:
@@ -208,7 +212,6 @@ class NuScenesDataset(Custom3DDataset):
 
     def get_data_info(self, index: int) -> Dict[str, Any]:
         info = self.data_infos[index]
-
         data = dict(
             token=info["token"],
             sample_idx=info['token'],
@@ -217,6 +220,13 @@ class NuScenesDataset(Custom3DDataset):
             timestamp=info["timestamp"],
             location=info["location"],
         )
+
+        # sample_likelihood should change for samples from cluster of different sizes
+        if self.dataset_equity and 'cluster_info' in info:
+            data['sample_likelihood'] = info['cluster_info']['cluster_size'] / \
+                                              info['cluster_info']['largest_cluster_size']
+        else:
+            data['sample_likelihood'] = 1.0
 
         # ego to global transform
         ego2global = np.eye(4).astype(np.float32)
@@ -238,7 +248,7 @@ class NuScenesDataset(Custom3DDataset):
             data["camera_intrinsics"] = []
             data["camera2lidar"] = []
 
-            for _, camera_info in info["cams"].items():
+            for _, camera_info in info["cams"].items():            
                 data["image_paths"].append(camera_info["data_path"])
 
                 # lidar to camera transform
@@ -407,6 +417,7 @@ class NuScenesDataset(Custom3DDataset):
         logger=None,
         metric="bbox",
         result_name="pts_bbox",
+        jsonfile_prefix=None,
     ):
         """Evaluation for a single model in nuScenes protocol.
 
@@ -456,6 +467,56 @@ class NuScenesDataset(Custom3DDataset):
 
         detail["object/nds"] = metrics["nd_score"]
         detail["object/map"] = metrics["mean_ap"]
+        # print("metrics.keys()", metrics.keys())
+
+        mean_metrics = [metrics["nd_score"]]
+        mean_metrics_name = ['NDS']
+        mean_metrics.append(metrics['mean_ap'])
+        mean_metrics_name.append('mAP')
+        
+        for tp_name, tp_val in metrics['tp_errors'].items():
+            print('%s: %.4f' % (self.ErrNameMapping[tp_name], tp_val))
+            # save mean metrics and their corresponding names
+            mean_metrics.append(tp_val)
+            mean_metrics_name.append(self.ErrNameMapping[tp_name])
+
+        df_mean_metrics = pd.DataFrame([mean_metrics])
+        df_mean_metrics.columns = mean_metrics_name
+        print("df_mean_metrics \n", df_mean_metrics)
+        
+        mean_metrics_path = osp.join(jsonfile_prefix, 'mean_metrics.csv')
+        df_mean_metrics.to_csv(mean_metrics_path, index=False)
+        print("Mean evaluation metrics results saved at ", mean_metrics_path, '\n')
+
+        # save per class results
+        class_aps = metrics['mean_dist_aps']
+        class_tps = metrics['label_tp_errors']
+        class_names, APs, ATEs, ASEs, AOEs, AVEs, AAEs = [], [], [], [], [], [], []
+        for class_name in class_aps.keys():
+            print('%s\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f'
+                  % (class_name, class_aps[class_name],
+                     class_tps[class_name]['trans_err'],
+                     class_tps[class_name]['scale_err'],
+                     class_tps[class_name]['orient_err'],
+                     class_tps[class_name]['vel_err'],
+                     class_tps[class_name]['attr_err']))
+            # save per class metrics and their corresponding names
+            class_names.append(class_name)
+            APs.append(class_aps[class_name])
+            ATEs.append(class_tps[class_name]['trans_err'])
+            ASEs.append(class_tps[class_name]['scale_err'])
+            AOEs.append(class_tps[class_name]['orient_err'])
+            AVEs.append(class_tps[class_name]['vel_err'])
+            AAEs.append(class_tps[class_name]['attr_err'])
+
+        # create data frame to store the per class metrics
+        columns = ['Object Class', 'AP', 'ATE', 'ASE', 'AOE', 'AVE', 'AAE'] 
+        df_per_class_metrics = pd.DataFrame(list(zip(class_names, APs, ATEs, ASEs, AOEs, AVEs, AAEs)), columns=columns)
+        # save the dataframe in csv format
+        per_class_mertcis_path = osp.join(jsonfile_prefix, 'per_class_metrics.csv')
+        df_per_class_metrics.to_csv(per_class_mertcis_path, index=False)
+        print("Per-class results saved at ", per_class_mertcis_path, '\n')
+
         return detail
 
     def format_results(self, results, jsonfile_prefix=None):
@@ -555,10 +616,10 @@ class NuScenesDataset(Custom3DDataset):
             if isinstance(result_files, dict):
                 for name in result_names:
                     print("Evaluating bboxes of {}".format(name))
-                    ret_dict = self._evaluate_single(result_files[name])
+                    ret_dict = self._evaluate_single(result_files[name], jsonfile_prefix=jsonfile_prefix)
                 metrics.update(ret_dict)
             elif isinstance(result_files, str):
-                metrics.update(self._evaluate_single(result_files))
+                metrics.update(self._evaluate_single(result_files, jsonfile_prefix=jsonfile_prefix))
 
             if tmp_dir is not None:
                 tmp_dir.cleanup()

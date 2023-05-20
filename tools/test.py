@@ -95,6 +95,8 @@ def parse_args():
         help="job launcher",
     )
     parser.add_argument("--local_rank", type=int, default=0)
+    parser.add_argument('--eval-dir', help='directory where metrics summary files will be saved')
+    
     args = parser.parse_args()
     if "LOCAL_RANK" not in os.environ:
         os.environ["LOCAL_RANK"] = str(args.local_rank)
@@ -223,7 +225,8 @@ def main():
             ]:
                 eval_kwargs.pop(key, None)
             eval_kwargs.update(dict(metric=args.eval, **kwargs))
-            print(dataset.evaluate(outputs, **eval_kwargs))
+            results_dict = dataset.evaluate(outputs, jsonfile_prefix=args.eval_dir, **eval_kwargs)
+            print(results_dict)
 
 
 if __name__ == "__main__":

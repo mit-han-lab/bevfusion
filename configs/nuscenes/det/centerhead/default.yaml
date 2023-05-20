@@ -2,6 +2,8 @@ model:
   heads:
     object:
       type: CenterHead
+      dequity_eta: 0.3
+      dequity_gamma: 5.0
       in_channels: null
       train_cfg:
         point_cloud_range: ${point_cloud_range}
@@ -60,3 +62,4 @@ model:
         reduction: mean
         loss_weight: 0.25
       norm_bbox: true
+      
