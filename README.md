@@ -11,6 +11,7 @@
 
 **If you are interested in getting updates, please sign up [here](https://docs.google.com/forms/d/e/1FAIpQLSfkmfsX45HstL5rUQlS7xJthhS3Z_Pm2NOVstlXUqgaK4DEfQ/viewform) to get notified!**
 
+- **(2023/6/18)** We announce [TorchSparse++](https://github.com/mit-han-lab/torchsparse), the state-of-the-art GPU library for sparse point cloud convolution. BEVFusion is now backed by TorchSparse++.
 - **(2023/1/16)** BEVFusion is accepted to ICRA 2023!
 - **(2022/8/16)** BEVFusion ranks first on [Waymo](https://waymo.com/open/challenges/2020/3d-detection/) 3D object detection leaderboard among all solutions.
 - **(2022/6/3)** BEVFusion ranks first on [nuScenes](https://nuscenes.org/object-detection?externalData=all&mapData=all&modalities=Any) among all solutions.
@@ -138,6 +139,14 @@ We also provide instructions for evaluating our pretrained models. Please downlo
 ./tools/download_pretrained.sh
 ```
 
+The checkpoints will be automatically converted to **TorchSparse++** format using [this file](tools/convert_checkpoints_to_torchsparse.py). Please make sure you run 
+
+```bash
+python tools/convert_checkpoints_to_torchsparse.py [path to old ckpt] [path to new ckpt]
+```
+
+if you manually downloaded the checkpoints.
+
 Then, you will be able to run:
 
 ```bash
@@ -221,3 +230,4 @@ If BEVFusion is useful or relevant to your research, please kindly recognize our
   year={2023}
 }
 ```
+

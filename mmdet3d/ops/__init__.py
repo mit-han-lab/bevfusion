@@ -37,8 +37,10 @@ from .roiaware_pool3d import (
     points_in_boxes_cpu,
     points_in_boxes_gpu,
 )
-from .sparse_block import SparseBasicBlock, SparseBottleneck, make_sparse_convmodule
+# from .sparse_block import SparseBasicBlock, SparseBottleneck, make_sparse_convmodule
+from .sparse_block import SparseBasicBlock, make_sparse_convmodule
 from .voxel import DynamicScatter, Voxelization, dynamic_scatter, voxelization
+from .spconv import *
 
 __all__ = [
     "nms",
@@ -57,7 +59,7 @@ __all__ = [
     "sigmoid_focal_loss",
     "SigmoidFocalLoss",
     "SparseBasicBlock",
-    "SparseBottleneck",
+    # "SparseBottleneck",
     "RoIAwarePool3d",
     "points_in_boxes_gpu",
     "points_in_boxes_cpu",
