@@ -1,9 +1,24 @@
-gt_paste_stop_epoch: 15
+radar_sweeps: 6
+radar_max_points: 2500
+radar_use_dims: [0, 1, 2, 5, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56]
+radar_compensate_velocity: true 
+radar_filtering: none
+
+radar_voxel_size: [0.8, 0.8, 8]
+image_size: [256, 704]
+radar_jitter: 0
+radar_normalize: false
+
+augment2d:
+  resize: [[0.38, 0.55], [0.48, 0.48]]
 
 augment3d:
-  scale: [0.95, 1.05]
-  rotate: [-0.3925, 0.3925]
-  translate: 0
+  scale: [0.9, 1.1]
+  rotate: [0, 0]
+  translate: 0.5
+
+gt_paste_stop_epoch: 15
+# lr_config: null
 
 model:
   encoders:
@@ -16,6 +31,7 @@ model:
         ybound: [-51.2, 51.2, 0.8]
         zbound: [-10.0, 10.0, 20.0]
         dbound: [1.0, 60.0, 1.0]
+    radar: null
   heads:
     object:
       test_cfg:
@@ -33,20 +49,6 @@ model:
           - [1.0]
           - [1.0, 1.0]
           - [2.5, 4.0]
-
-lr_config: null
-
-
-radar_sweeps: 6
-radar_max_points: 2500
-radar_use_dims: [0, 1, 2, 5, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56]
-radar_compensate_velocity: true 
-radar_filtering: none
-
-radar_voxel_size: [0.8, 0.8, 8]
-image_size: [256, 704]
-radar_jitter: 0
-radar_normalize: false
 
 
 data:

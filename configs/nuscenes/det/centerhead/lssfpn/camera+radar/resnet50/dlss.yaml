@@ -1,0 +1,13 @@
+
+model:
+  encoders:
+    camera:
+      vtransform:
+        type: AwareDBEVDepth
+        bevdepth_downsample: 16
+        bevdepth_refine: false
+        depth_loss_factor: 3.0
+        use_points: radar
+        depth_input: one-hot
+        height_expand: true
+        add_depth_features: true

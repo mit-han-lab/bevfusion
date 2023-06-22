@@ -6,3 +6,4 @@ from .sparse_encoder import *
 from .pillar_encoder import *
 from .vovnet import *
 from .dla import *
+from .radar_encoder import *

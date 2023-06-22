@@ -23,6 +23,78 @@ from .utils import noise_per_object_v3_
 
 
 @PIPELINES.register_module()
+class GTDepth:
+    def __init__(self, keyframe_only=False):
+        self.keyframe_only = keyframe_only 
+
+    def __call__(self, data):
+        sensor2ego = data['camera2ego'].data
+        cam_intrinsic = data['camera_intrinsics'].data 
+        img_aug_matrix = data['img_aug_matrix'].data 
+        bev_aug_matrix = data['lidar_aug_matrix'].data
+        lidar2ego = data['lidar2ego'].data 
+        camera2lidar = data['camera2lidar'].data
+        lidar2image = data['lidar2image'].data
+
+        rots = sensor2ego[..., :3, :3]
+        trans = sensor2ego[..., :3, 3]
+        intrins = cam_intrinsic[..., :3, :3]
+        post_rots = img_aug_matrix[..., :3, :3]
+        post_trans = img_aug_matrix[..., :3, 3]
+        lidar2ego_rots = lidar2ego[..., :3, :3]
+        lidar2ego_trans = lidar2ego[..., :3, 3]
+        camera2lidar_rots = camera2lidar[..., :3, :3]
+        camera2lidar_trans = camera2lidar[..., :3, 3]
+
+        points = data['points'].data 
+        img = data['img'].data
+
+        if self.keyframe_only:
+            points = points[points[:, 4] == 0]
+
+        batch_size = len(points)
+        depth = torch.zeros(img.shape[0], *img.shape[-2:]) #.to(points[0].device)
+
+        # for b in range(batch_size):
+        cur_coords = points[:, :3]
+
+        # inverse aug
+        cur_coords -= bev_aug_matrix[:3, 3]
+        cur_coords = torch.inverse(bev_aug_matrix[:3, :3]).matmul(
+            cur_coords.transpose(1, 0)
+        )
+        # lidar2image
+        cur_coords = lidar2image[:, :3, :3].matmul(cur_coords)
+        cur_coords += lidar2image[:, :3, 3].reshape(-1, 3, 1)
+        # get 2d coords
+        dist = cur_coords[:, 2, :]
+        cur_coords[:, 2, :] = torch.clamp(cur_coords[:, 2, :], 1e-5, 1e5)
+        cur_coords[:, :2, :] /= cur_coords[:, 2:3, :]
+
+        # imgaug
+        cur_coords = img_aug_matrix[:, :3, :3].matmul(cur_coords)
+        cur_coords += img_aug_matrix[:, :3, 3].reshape(-1, 3, 1)
+        cur_coords = cur_coords[:, :2, :].transpose(1, 2)
+
+        # normalize coords for grid sample
+        cur_coords = cur_coords[..., [1, 0]]
+
+        on_img = (
+            (cur_coords[..., 0] < img.shape[2])
+            & (cur_coords[..., 0] >= 0)
+            & (cur_coords[..., 1] < img.shape[3])
+            & (cur_coords[..., 1] >= 0)
+        )
+        for c in range(on_img.shape[0]):
+            masked_coords = cur_coords[c, on_img[c]].long()
+            masked_dist = dist[c, on_img[c]]
+            depth[c, masked_coords[:, 0], masked_coords[:, 1]] = masked_dist
+
+        data['depths'] = depth 
+        return data
+
+
+@PIPELINES.register_module()
 class ImageAug3D:
     def __init__(
         self, final_dim, resize_lim, bot_pct_lim, rot_lim, rand_flip, is_train
@@ -142,6 +214,11 @@ class GlobalRotScaleTrans:
                 data["points"].translate(translation)
                 data["points"].scale(scale)
 
+            if "radar" in data:
+                data["radar"].rotate(-theta)
+                data["radar"].translate(translation)
+                data["radar"].scale(scale)
+
             gt_boxes = data["gt_bboxes_3d"]
             rotation = rotation @ gt_boxes.rotate(theta).numpy()
             gt_boxes.translate(translation)
@@ -254,6 +331,8 @@ class RandomFlip3D:
             rotation = np.array([[1, 0, 0], [0, -1, 0], [0, 0, 1]]) @ rotation
             if "points" in data:
                 data["points"].flip("horizontal")
+            if "radar" in data:
+                data["radar"].flip("horizontal")
             if "gt_bboxes_3d" in data:
                 data["gt_bboxes_3d"].flip("horizontal")
             if "gt_masks_bev" in data:
@@ -263,6 +342,8 @@ class RandomFlip3D:
             rotation = np.array([[-1, 0, 0], [0, 1, 0], [0, 0, 1]]) @ rotation
             if "points" in data:
                 data["points"].flip("vertical")
+            if "radar" in data:
+                data["radar"].flip("vertical")
             if "gt_bboxes_3d" in data:
                 data["gt_bboxes_3d"].flip("vertical")
             if "gt_masks_bev" in data:
@@ -522,6 +603,14 @@ class PointsRangeFilter:
         points_mask = points.in_range_3d(self.pcd_range)
         clean_points = points[points_mask]
         data["points"] = clean_points
+
+        if "radar" in data:
+            radar = data["radar"]
+            # radar_mask = radar.in_range_3d(self.pcd_range)
+            radar_mask = radar.in_range_bev([-55.0, -55.0, 55.0, 55.0])
+            clean_radar = radar[radar_mask]
+            data["radar"] = clean_radar
+
         return data
 
 

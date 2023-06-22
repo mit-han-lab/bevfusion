@@ -3,14 +3,17 @@ from typing import Any, Dict, Tuple
 
 import mmcv
 import numpy as np
+from mmdet3d.core.points import RadarPoints
+from nuscenes.utils.data_classes import RadarPointCloud
 from nuscenes.map_expansion.map_api import NuScenesMap
 from nuscenes.map_expansion.map_api import locations as LOCATIONS
 from PIL import Image
 
-
 from mmdet3d.core.points import BasePoints, get_points_type
 from mmdet.datasets.builder import PIPELINES
 from mmdet.datasets.pipelines import LoadAnnotations
+
+import torch
 
 from .loading_utils import load_augmented_point_cloud, reduce_LiDAR_beams
 
@@ -180,6 +183,7 @@ class LoadPointsFromMultiSweeps:
                     cloud arrays.
         """
         points = results["points"]
+        points = points[:, self.use_dim]
         points.tensor[:, 4] = 0
         sweep_points_list = [points]
         ts = results["timestamp"] / 1e6
@@ -216,6 +220,7 @@ class LoadPointsFromMultiSweeps:
 
                 if self.remove_close:
                     points_sweep = self._remove_close(points_sweep)
+                points_sweep = points_sweep[:, self.use_dim]
                 sweep_ts = sweep["timestamp"] / 1e6
                 points_sweep[:, :3] = (
                     points_sweep[:, :3] @ sweep["sensor2lidar_rotation"].T
@@ -226,7 +231,7 @@ class LoadPointsFromMultiSweeps:
                 sweep_points_list.append(points_sweep)
 
         points = points.cat(sweep_points_list)
-        points = points[:, self.use_dim]
+
         results["points"] = points
         return results
 
@@ -258,6 +263,7 @@ class LoadBEVSegmentation:
             self.maps[location] = NuScenesMap(dataset_root, location)
 
     def __call__(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        # print(data.keys())
         lidar2point = data["lidar_aug_matrix"]
         point2lidar = np.linalg.inv(lidar2point)
         lidar2ego = data["lidar2ego"]
@@ -556,3 +562,244 @@ class LoadAnnotations3D(LoadAnnotations):
             results = self._load_attr_labels(results)
 
         return results
+
+
+@PIPELINES.register_module()
+class NormalizePointFeatures:
+    def __call__(self, results):
+        points = results["points"]
+        points.tensor[:, 3] = torch.tanh(points.tensor[:, 3])
+        results["points"] = points
+        return results
+
+
+@PIPELINES.register_module()
+class LoadRadarPointsMultiSweeps(object):
+    """Load radar points from multiple sweeps.
+    This is usually used for nuScenes dataset to utilize previous sweeps.
+    Args:
+        sweeps_num (int): Number of sweeps. Defaults to 10.
+        load_dim (int): Dimension number of the loaded points. Defaults to 5.
+        use_dim (list[int]): Which dimension to use. Defaults to [0, 1, 2, 4].
+        file_client_args (dict): Config dict of file clients, refer to
+            https://github.com/open-mmlab/mmcv/blob/master/mmcv/fileio/file_client.py
+            for more details. Defaults to dict(backend='disk').
+        pad_empty_sweeps (bool): Whether to repeat keyframe when
+            sweeps is empty. Defaults to False.
+        remove_close (bool): Whether to remove close points.
+            Defaults to False.
+        test_mode (bool): If test_model=True used for testing, it will not
+            randomly sample sweeps but select the nearest N frames.
+            Defaults to False.
+    """
+
+    def __init__(self,
+                 load_dim=18,
+                 use_dim=[0, 1, 2, 3, 4],
+                 sweeps_num=3, 
+                 file_client_args=dict(backend='disk'),
+                 max_num=300,
+                 pc_range=[-51.2, -51.2, -5.0, 51.2, 51.2, 3.0], 
+                 compensate_velocity=False, 
+                 normalize_dims=[(3, 0, 50), (4, -100, 100), (5, -100, 100)], 
+                 filtering='default', 
+                 normalize=False, 
+                 test_mode=False):
+        self.load_dim = load_dim
+        self.use_dim = use_dim
+        self.sweeps_num = sweeps_num
+        self.file_client_args = file_client_args.copy()
+        self.file_client = None
+        self.max_num = max_num
+        self.test_mode = test_mode
+        self.pc_range = pc_range
+        self.compensate_velocity = compensate_velocity
+        self.normalize_dims = normalize_dims
+        self.filtering = filtering 
+        self.normalize = normalize
+
+        self.encoding = [
+            (3, 'one-hot', 8), # dynprop
+            (11, 'one-hot', 5), # ambig_state
+            (14, 'one-hot', 18), # invalid_state
+            (15, 'ordinal', 7), # pdh
+            (0, 'nusc-filter', 1) # binary feature: 1 if nusc would have filtered it out
+        ]
+
+
+    def perform_encodings(self, points, encoding):
+        for idx, encoding_type, encoding_dims in self.encoding:
+            # print(f'Performing {encoding_type} encoding on idx {idx}, generating an additional {encoding_dims} dims')
+            assert encoding_type in ['one-hot', 'ordinal', 'nusc-filter']
+
+            feat = points[:, idx]
+
+            if encoding_type == 'one-hot':
+                encoding = np.zeros((points.shape[0], encoding_dims))
+                encoding[np.arange(feat.shape[0]), np.rint(feat).astype(int)] = 1
+            if encoding_type == 'ordinal':
+                encoding = np.zeros((points.shape[0], encoding_dims))
+                for i in range(encoding_dims):
+                    encoding[:, i] = (np.rint(feat) > i).astype(int)
+            if encoding_type == 'nusc-filter':
+                encoding = np.zeros((points.shape[0], encoding_dims))
+                mask1 = (points[:, 14] == 0)
+                mask2 = (points[:, 3] < 7)
+                mask3 = (points[:, 11] == 3)
+
+                encoding[mask1 & mask2 & mask3, 0] = 1
+
+
+            points = np.concatenate([points, encoding], axis=1)
+        return points
+
+    def _load_points(self, pts_filename):
+        """Private function to load point clouds data.
+        Args:
+            pts_filename (str): Filename of point clouds data.
+        Returns:
+            np.ndarray: An array containing point clouds data.
+            [N, 18]
+        """
+
+        invalid_states, dynprop_states, ambig_states = {
+            'default': ([0], range(7), [3]), 
+            'none': (range(18), range(8), range(5)), 
+        }[self.filtering]
+
+        radar_obj = RadarPointCloud.from_file(
+            pts_filename, 
+            invalid_states, dynprop_states, ambig_states
+        )
+
+        #[18, N]
+        points = radar_obj.points
+
+        return points.transpose().astype(np.float32)
+        
+
+    def _pad_or_drop(self, points):
+        '''
+        points: [N, 18]
+        '''
+
+        num_points = points.shape[0]
+
+        if num_points == self.max_num:
+            masks = np.ones((num_points, 1), 
+                        dtype=points.dtype)
+
+            return points, masks
+        
+        if num_points > self.max_num:
+            points = np.random.permutation(points)[:self.max_num, :]
+            masks = np.ones((self.max_num, 1), 
+                        dtype=points.dtype)
+            
+            return points, masks
+
+        if num_points < self.max_num:
+            zeros = np.zeros((self.max_num - num_points, points.shape[1]), 
+                        dtype=points.dtype)
+            masks = np.ones((num_points, 1), 
+                        dtype=points.dtype)
+            
+            points = np.concatenate((points, zeros), axis=0)
+            masks = np.concatenate((masks, zeros.copy()[:, [0]]), axis=0)
+
+            return points, masks
+
+    def normalize_feats(self, points, normalize_dims):
+        for dim, min, max in normalize_dims:
+            points[:, dim] -= min 
+            points[:, dim] /= (max-min)
+        return points
+
+    def __call__(self, results):
+        """Call function to load multi-sweep point clouds from files.
+        Args:
+            results (dict): Result dict containing multi-sweep point cloud \
+                filenames.
+        Returns:
+            dict: The result dict containing the multi-sweep points data. \
+                Added key and value are described below.
+                - points (np.ndarray | :obj:`BasePoints`): Multi-sweep point \
+                    cloud arrays.
+        """
+        radars_dict = results['radar']
+
+        # print("HERE")
+        # print(radars_dict.keys())
+
+        points_sweep_list = []
+        for key, sweeps in radars_dict.items():
+            # print(len(sweeps))
+            if len(sweeps) < self.sweeps_num:
+                idxes = list(range(len(sweeps)))
+            else:
+                idxes = list(range(self.sweeps_num))
+            # print(idxes, key)
+            ts = sweeps[0]['timestamp'] * 1e-6
+            for idx in idxes:
+                sweep = sweeps[idx]
+
+                points_sweep = self._load_points(sweep['data_path'])
+                points_sweep = np.copy(points_sweep).reshape(-1, self.load_dim)
+                # print(points_sweep.shape)
+
+                timestamp = sweep['timestamp'] * 1e-6
+                time_diff = ts - timestamp
+                time_diff = np.ones((points_sweep.shape[0], 1)) * time_diff
+
+                # velocity compensated by the ego motion in sensor frame
+                velo_comp = points_sweep[:, 8:10]
+                velo_comp = np.concatenate(
+                    (velo_comp, np.zeros((velo_comp.shape[0], 1))), 1)
+                velo_comp = velo_comp @ sweep['sensor2lidar_rotation'].T
+                velo_comp = velo_comp[:, :2]
+
+                # velocity in sensor frame
+                velo = points_sweep[:, 6:8]
+                velo = np.concatenate(
+                    (velo, np.zeros((velo.shape[0], 1))), 1)
+                velo = velo @ sweep['sensor2lidar_rotation'].T
+                velo = velo[:, :2]
+
+                points_sweep[:, :3] = points_sweep[:, :3] @ sweep[
+                    'sensor2lidar_rotation'].T
+                points_sweep[:, :3] += sweep['sensor2lidar_translation']
+
+                if self.compensate_velocity:
+                    points_sweep[:, :2] += velo_comp * time_diff
+
+                points_sweep_ = np.concatenate(
+                    [points_sweep[:, :6], velo,
+                     velo_comp, points_sweep[:, 10:],
+                     time_diff], axis=1)
+
+                # current format is x y z dyn_prop id rcs vx vy vx_comp vy_comp is_quality_valid ambig_state x_rms y_rms invalid_state pdh0 vx_rms vy_rms timestamp
+                points_sweep_list.append(points_sweep_)
+        
+        points = np.concatenate(points_sweep_list, axis=0)
+
+        points = self.perform_encodings(points, self.encoding)
+
+        # print(points.shape)
+        
+        points = points[:, self.use_dim]
+        # print(points.shape)
+
+        if self.normalize:
+            points = self.normalize_feats(points, self.normalize_dims)
+        
+        points = RadarPoints(
+            points, points_dim=points.shape[-1], attribute_dims=None
+        )
+        
+        results['radar'] = points
+        
+        return results
+
+    def __repr__(self):
+        """str: Return a string that describes the module."""
+        return f'{self.__class__.__name__}(sweeps_num={self.sweeps_num})'
