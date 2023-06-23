@@ -147,25 +147,31 @@ class BEVFusion(Base3DFusionModel):
             gt_depths=gt_depths,
         )
         return x
-
-    def extract_lidar_features(self, x) -> torch.Tensor:
-        feats, coords, sizes = self.voxelize(x)
+    
+    def extract_features(self, x, sensor) -> torch.Tensor:
+        feats, coords, sizes = self.voxelize(x, sensor)
         batch_size = coords[-1, 0] + 1
-        x = self.encoders["lidar"]["backbone"](feats, coords, batch_size, sizes=sizes)
+        x = self.encoders[sensor]["backbone"](feats, coords, batch_size, sizes=sizes)
         return x
+    
+    # def extract_lidar_features(self, x) -> torch.Tensor:
+    #     feats, coords, sizes = self.voxelize(x)
+    #     batch_size = coords[-1, 0] + 1
+    #     x = self.encoders["lidar"]["backbone"](feats, coords, batch_size, sizes=sizes)
+    #     return x
 
-    def extract_radar_features(self, x) -> torch.Tensor:
-        feats, coords, sizes = self.radar_voxelize(x)
-        batch_size = coords[-1, 0] + 1
-        x = self.encoders["radar"]["backbone"](feats, coords, batch_size, sizes=sizes)
-        return x
+    # def extract_radar_features(self, x) -> torch.Tensor:
+    #     feats, coords, sizes = self.radar_voxelize(x)
+    #     batch_size = coords[-1, 0] + 1
+    #     x = self.encoders["radar"]["backbone"](feats, coords, batch_size, sizes=sizes)
+    #     return x
 
     @torch.no_grad()
     @force_fp32()
-    def voxelize(self, points):
+    def voxelize(self, points, sensor):
         feats, coords, sizes = [], [], []
         for k, res in enumerate(points):
-            ret = self.encoders["lidar"]["voxelize"](res)
+            ret = self.encoders[sensor]["voxelize"](res)
             if len(ret) == 3:
                 # hard voxelize
                 f, c, n = ret
@@ -190,35 +196,35 @@ class BEVFusion(Base3DFusionModel):
 
         return feats, coords, sizes
 
-    @torch.no_grad()
-    @force_fp32()
-    def radar_voxelize(self, points):
-        feats, coords, sizes = [], [], []
-        for k, res in enumerate(points):
-            ret = self.encoders["radar"]["voxelize"](res)
-            if len(ret) == 3:
-                # hard voxelize
-                f, c, n = ret
-            else:
-                assert len(ret) == 2
-                f, c = ret
-                n = None
-            feats.append(f)
-            coords.append(F.pad(c, (1, 0), mode="constant", value=k))
-            if n is not None:
-                sizes.append(n)
+    # @torch.no_grad()
+    # @force_fp32()
+    # def radar_voxelize(self, points):
+    #     feats, coords, sizes = [], [], []
+    #     for k, res in enumerate(points):
+    #         ret = self.encoders["radar"]["voxelize"](res)
+    #         if len(ret) == 3:
+    #             # hard voxelize
+    #             f, c, n = ret
+    #         else:
+    #             assert len(ret) == 2
+    #             f, c = ret
+    #             n = None
+    #         feats.append(f)
+    #         coords.append(F.pad(c, (1, 0), mode="constant", value=k))
+    #         if n is not None:
+    #             sizes.append(n)
 
-        feats = torch.cat(feats, dim=0)
-        coords = torch.cat(coords, dim=0)
-        if len(sizes) > 0:
-            sizes = torch.cat(sizes, dim=0)
-            if self.voxelize_reduce:
-                feats = feats.sum(dim=1, keepdim=False) / sizes.type_as(feats).view(
-                    -1, 1
-                )
-                feats = feats.contiguous()
+    #     feats = torch.cat(feats, dim=0)
+    #     coords = torch.cat(coords, dim=0)
+    #     if len(sizes) > 0:
+    #         sizes = torch.cat(sizes, dim=0)
+    #         if self.voxelize_reduce:
+    #             feats = feats.sum(dim=1, keepdim=False) / sizes.type_as(feats).view(
+    #                 -1, 1
+    #             )
+    #             feats = feats.contiguous()
 
-        return feats, coords, sizes
+    #     return feats, coords, sizes
 
     @auto_fp16(apply_to=("img", "points"))
     def forward(
@@ -309,17 +315,13 @@ class BEVFusion(Base3DFusionModel):
                 )
                 if self.use_depth_loss:
                     feature, auxiliary_losses['depth'] = feature[0], feature[-1]
-                # else:
-                #     feature = feature[0]
             elif sensor == "lidar":
-                feature = self.extract_lidar_features(points)
+                feature = self.extract_features(points, sensor)
             elif sensor == "radar":
-                # camera_features = features_dict.get('camera', None)
-                feature = self.extract_radar_features(radar)
+                feature = self.extract_features(radar, sensor)
             else:
                 raise ValueError(f"unsupported sensor: {sensor}")
-            # print(sensor)
-            # print(type(feature))
+
             features.append(feature)
 
         if not self.training:
@@ -355,10 +357,6 @@ class BEVFusion(Base3DFusionModel):
             if self.use_depth_loss:
                 if 'depth' in auxiliary_losses:
                     outputs["loss/depth"] = auxiliary_losses['depth']
-                    # print('Depth loss:' + str(outputs['loss/depth'].item()))
-                    if outputs['loss/depth'].item() > 30:
-                        # torch.save(self, 'diverged_depth_loss_3.pth')
-                        quit()
                 else:
                     raise ValueError('Use depth loss is true, but depth loss not found')
             return outputs

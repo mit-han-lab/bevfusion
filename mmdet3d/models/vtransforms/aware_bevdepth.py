@@ -607,21 +607,6 @@ class AwareDBEVDepth(BaseDepthTransform):
                 nn.BatchNorm2d(64),
                 nn.ReLU(True),
             )
-            # self.dtransform = nn.Sequential(
-            #     nn.Conv2d(dtransform_in_channels, 32, 5, stride=4, padding=2),
-            #     nn.BatchNorm2d(32),
-            #     nn.ReLU(True),
-            #     nn.Conv2d(32, 32, 5, stride=2, padding=2),
-            #     nn.BatchNorm2d(32),
-            #     nn.ReLU(True),
-            #     nn.Conv2d(32, 64, 5, stride=2, padding=2),
-            #     nn.BatchNorm2d(64),
-            #     nn.ReLU(True),
-            #     # nn.Conv2d(64, 64, 5, stride=2, padding=2),
-            #     # nn.BatchNorm2d(64),
-            #     # nn.ReLU(True),
-            # )
-
 
 
         if downsample > 1:
@@ -660,10 +645,7 @@ class AwareDBEVDepth(BaseDepthTransform):
         x = self.depthnet(x, mats_dict)
         depth = x[:, : self.D].softmax(dim=1)
 
-        # torch.save(depth.max(dim=1)[0], 'debug/depths.pth')
-        # print(depth.shape)
         x = depth.unsqueeze(1) * x[:, self.D : (self.D + self.C)].unsqueeze(2)
-        # print(x.shape)
 
         if self.bevdepth_refine:
             x = x.permute(0, 3, 1, 4, 2).contiguous() # [n, c, d, h, w] -> [n, h, c, w, d]
@@ -696,9 +678,6 @@ class AwareDBEVDepth(BaseDepthTransform):
         depth_preds = depth_preds.permute(0, 2, 3, 1).contiguous().view(
             -1, self.depth_channels)
         fg_mask = torch.max(depth_labels, dim=1).values > 0.0
-
-        # print(depth_labels.shape, depth_preds.shape)
-        # torch.Size([16896, 59]) torch.Size([16896, 59]) 
 
         with autocast(enabled=False):
             depth_loss = (F.binary_cross_entropy(

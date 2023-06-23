@@ -18,7 +18,6 @@ augment3d:
   translate: 0.5
 
 gt_paste_stop_epoch: 15
-# lr_config: null
 
 model:
   encoders:
@@ -185,7 +184,6 @@ train_pipeline:
       - radar
       - gt_bboxes_3d
       - gt_labels_3d
-      # - gt_masks_bev
     meta_keys:
       - camera_intrinsics
       - camera2ego
@@ -195,8 +193,6 @@ train_pipeline:
       - camera2lidar
       - img_aug_matrix
       - lidar_aug_matrix
-      # - bev_aug_matrix
-      # - inv_bev_aug_matrix_rot
   -
     type: GTDepth
     keyframe_only: true 
@@ -249,12 +245,6 @@ test_pipeline:
     rot_lim: [0.0, 0.0]
     trans_lim: 0.0
     is_train: false
-  #-
-  #  type: LoadBEVSegmentation
-  #  dataset_root: ${dataset_root}
-  #  xbound: [-50.0, 50.0, 0.5]
-  #  ybound: [-50.0, 50.0, 0.5]
-  #  classes: ${map_classes}
   -
     type: PointsRangeFilter
     point_cloud_range: ${point_cloud_range}
@@ -273,7 +263,6 @@ test_pipeline:
       - radar
       - gt_bboxes_3d
       - gt_labels_3d
-      #- gt_masks_bev
     meta_keys:
       - camera_intrinsics
       - camera2ego
@@ -283,8 +272,6 @@ test_pipeline:
       - camera2lidar
       - img_aug_matrix
       - lidar_aug_matrix
-      # - bev_aug_matrix
-      # - inv_bev_aug_matrix_rot
   -
     type: GTDepth
     keyframe_only: true 

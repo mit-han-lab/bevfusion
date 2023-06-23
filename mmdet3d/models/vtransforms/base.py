@@ -228,13 +228,9 @@ class BaseTransform(nn.Module):
         
         x = self.bev_pool(geom, x)
 
-        # print(use_depth, type(x))
-
         if use_depth:
             return x, depth 
         else:
-            # print('HERE')
-            # print(type(x))
             return x
 
 
@@ -328,13 +324,9 @@ class BaseDepthTransform(BaseTransform):
                     # These can arise when the point range filter is different from the dbound. 
                     masked_dist = torch.clamp(masked_dist, max=self.D-1)
                     depth[b, c, masked_dist.long(), masked_coords[:, 0], masked_coords[:, 1]] = 1.0
-                    # depth[b, c, :, masked_coords[:, 0], masked_coords[:, 1]] = nn.functional.one_hot(masked_dist.long(), self.D).transpose(0, 1).float()
 
                 if self.add_depth_features:
                     depth[b, c, -points[b].shape[-1]:, masked_coords[:, 0], masked_coords[:, 1]] = points[b][boolmask2idx(on_img[c])].transpose(0,1)
-                    # print(points[b][on_img[c]].transpose(0,1).shape)
-                    # print(depth[b, c, -points[b].shape[-1]:, masked_coords[:, 0], masked_coords[:, 1]].shape)
-                    # depth[b, c, :, masked_coords[:, 0], masked_coords[:, 1]] = points[b][on_img[c]]
 
         extra_rots = lidar_aug_matrix[..., :3, :3]
         extra_trans = lidar_aug_matrix[..., :3, 3]
@@ -363,12 +355,8 @@ class BaseDepthTransform(BaseTransform):
         
         x = self.bev_pool(geom, x)
 
-        # print(use_depth, type(x))
-
         if use_depth:
             return x, depth 
         else:
-            # print('HERE')
-            # print(type(x))
             return x
 

@@ -139,12 +139,11 @@ class RadarFeatureNet(nn.Module):
         self.pc_range = point_cloud_range
 
     def forward(self, features, num_voxels, coors):
-        # coors[:, 0] tells you the batch
+
         if not self.export_onnx:
             dtype = features.dtype
 
             # Find distance of x, y, and z from cluster center
-            # features = features[:, :, :self.num_input]
             points_mean = features[:, :, :3].sum(dim=1, keepdim=True) / num_voxels.type_as(
                 features
             ).view(-1, 1, 1)
@@ -203,53 +202,9 @@ class RadarEncoder(nn.Module):
         self.pts_bev_encoder = build_backbone(pts_bev_encoder) if pts_bev_encoder is not None else None
         self.post_scatter = build_backbone(post_scatter) if post_scatter is not None else None
 
-        # if pts_middle_encoder.get('downsample', 1) > 1:
-        #     assert pts_middle_encoder.get('downsample', 1) == 4
-        #     channels = pts_middle_encoder['in_channels']
-        #     self.post_scatter_conv = torch.nn.Sequential(
-        #         nn.Conv2d(channels, channels, 3, stride=2, padding=1), 
-        #         nn.Conv2d(channels, channels, 3, stride=2, padding=1), 
-        #     )
-        # elif pts_middle_encoder.get('share_conv', 0) > 0:
-        #     channels = pts_middle_encoder['in_channels']
-        #     conv_size = pts_middle_encoder['share_conv']
-
-        #     norm_cfg=dict(type="BN", eps=1e-3, momentum=0.01)
-        #     conv_cfg=dict(type="Conv2d", bias=False)
-
-        #     self.post_scatter_conv = torch.nn.Sequential(
-        #         build_conv_layer(
-        #             conv_cfg, channels, channels, conv_size, stride=1, padding=2, 
-        #         ), 
-        #         build_norm_layer(
-        #             norm_cfg, channels
-        #         )[1], 
-        #         nn.ReLU(inplace=True), 
-        #         build_conv_layer(
-        #             conv_cfg, channels, channels, conv_size, stride=1, padding=2, 
-        #         ), 
-        #         build_norm_layer(
-        #             norm_cfg, channels
-        #         )[1], 
-        #         nn.ReLU(inplace=True), 
-        #         build_conv_layer(
-        #             conv_cfg, channels, channels, conv_size, stride=1, padding=2, 
-        #         ), 
-        #         build_norm_layer(
-        #             norm_cfg, channels
-        #         )[1], 
-        #         nn.ReLU(inplace=True)
-        #     )
-        # else:
-        #     self.post_scatter_conv = None
-
     def forward(self, feats, coords, batch_size, sizes, img_features=None):
-        # self.visualize_pillars(feats, coords, sizes)
-        # print(feats.shape)
-
         x = self.pts_voxel_encoder(feats, sizes, coords)
-        # print(x.shape, coords.shape, batch_size)
-        # return x
+
         if self.pts_transformer_encoder is not None:
             x = self.pts_transformer_encoder(x, sizes, coords, batch_size)
 
@@ -261,9 +216,7 @@ class RadarEncoder(nn.Module):
         if self.pts_bev_encoder is not None:
             x = self.pts_bev_encoder(x)
         
-      
-        # if x.shape[-1] != 128:
-        #     x = F.interpolate(x, size=[128, 128])
+    
         return x
 
     def visualize_pillars(self, feats, coords, sizes):
@@ -275,201 +228,3 @@ class RadarEncoder(nn.Module):
         indices = indices.type(torch.long)
         canvas[indices] = sizes
         torch.save(canvas, 'sample_canvas')
-
-@BACKBONES.register_module()
-class PostScatterUNet(nn.Module):
-
-    def __init__(self):
-        super().__init__()
-
-    def forward(self, x):
-        pass 
-
-@BACKBONES.register_module()
-class PostScatterConvNet(nn.Module):
-
-    def __init__(self, channels, num_layers=3, conv_size=5, padding=2, fuse_image=False):
-        super().__init__()
-
-        self.fuse_image = fuse_image
-        block = []
-        norm_cfg=dict(type="BN", eps=1e-3, momentum=0.01)
-        conv_cfg=dict(type="Conv2d", bias=False)
-        for i in range(num_layers):
-            block.append(
-                make_res_layer(
-                    BasicBlock, 
-                    channels, 
-                    channels, 
-                    1, 
-                    stride=1,
-                    dilation=1,
-
-                )
-            )
-
-            # Residual connections
-            # block.append(
-            #     build_conv_layer(
-            #         conv_cfg, channels, channels, conv_size, stride=1, padding=padding, 
-            #     )
-            # )
-            # block.append(build_norm_layer(norm_cfg, channels)[1])
-            # block.append(nn.ReLU(inplace=True))
-        self.net = nn.Sequential(*block)
-
-    def forward(self, x, img_bev_features=None):
-        if self.fuse_image:
-            if img_bev_features is None:
-                raise ValueError("Post scatter conv net wants to fuse image features, but they weren't provided")
-            x = x + img_bev_features # TODO I think concatenating would probably be better. 
-        return self.net(x) 
-
-@BACKBONES.register_module()
-class PostScatterNonlocalNet(nn.Module):
-
-    def __init__(self, channels, num_layers=3, fuse_image=False):
-        super().__init__()
-
-        self.fuse_image = fuse_image 
-        block = []
-        norm_cfg=dict(type="BN", eps=1e-3, momentum=0.01)
-        conv_cfg=dict(type="Conv2d")
-        for i in range(num_layers):
-            block.append(
-                NonLocal2d(
-                    channels, reduction=1, use_scale=False, conv_cfg=conv_cfg
-                )
-            )
-            block.append(build_norm_layer(norm_cfg, channels)[1])
-            block.append(nn.ReLU(inplace=True))
-        self.net = nn.Sequential(*block)
-
-    def forward(self, x, img_bev_features=None):
-        if self.fuse_image:
-            if img_bev_features is None:
-                raise ValueError("Post scatter conv net wants to fuse image features, but they weren't provided")
-            x = x + img_bev_features # TODO I think concatenating would probably be better. 
-        return self.net(x) 
-
-
-@BACKBONES.register_module()
-class TransformerEncoder(nn.Module):
-
-    def __init__(self, num_blocks=3, num_heads=8, embed_dim=64, use_position=True, norm_before=False):
-        super(TransformerEncoder, self).__init__()
-
-        self.positional_embedding = PositionalEmbedding(pos_temperature = 10000, embed_dim=embed_dim) if use_position else None
-
-        self.num_blocks = num_blocks 
-        self.blocks = nn.ModuleList()
-        for i in range(num_blocks):
-            self.blocks.append(TransformerEncoderBlock(num_heads, embed_dim, norm_before))
-        # self._reset_parameters()
-
-    def forward(self, x, sizes, coords, batch_size):
-        # TODO positional embeddings 
-        if self.positional_embedding is not None:
-            pe = self.positional_embedding(x, coords)
-            x = x + pe
-
-        for block in self.blocks:
-            x = block(x, sizes, coords, batch_size)
-        return x
-
-class TransformerEncoderBlock(nn.Module):
-    def __init__(self, num_heads=8, embed_dim=64, norm_before=False):
-        super(TransformerEncoderBlock, self).__init__()
-
-        self.mha = FlashMHA(
-            embed_dim=embed_dim, # total channels (= num_heads * head_dim)
-            num_heads=num_heads, # number of heads
-        )
-        activation = nn.ReLU
-        # activation = nn.GeLU
-
-        self.norm1 = nn.LayerNorm((embed_dim))
-        self.norm2 = nn.LayerNorm((embed_dim))
-        self.mlp = nn.Sequential(
-            nn.Linear(embed_dim, 2*embed_dim), 
-            activation(),
-            nn.Linear(2*embed_dim, embed_dim), 
-        )
-        self.norm_before = norm_before
-
-
-    def forward(self, x, sizes, coords, batch_size):
-        # x should be something like (N, 64) here. 
-        outputs = []
-
-        for batch in range(batch_size):
-            batch_mask = coords[:, 0] == batch 
-            mha_input = x[batch_mask].unsqueeze(0)
-
-            if self.norm_before:
-                mha_output = self.mha(self.norm1(mha_input))[0][0]
-                mlp_input = x[batch_mask] + mha_output
-                mlp_output = self.mlp(self.norm2(mlp_input))
-                output = mlp_output + mlp_input 
-                outputs.append(output)
-            else:
-                mha_output = self.mha(mha_input)[0][0]
-                mlp_input = self.norm1(x[batch_mask] + mha_output)
-                mlp_output = self.mlp(mlp_input)
-                output = self.norm2(mlp_input + mlp_output)
-                outputs.append(output)
-
-        outputs = torch.cat(outputs)
-        return outputs
-
-class PositionalEmbedding(nn.Module):
-    def __init__(
-        self,
-        # sparse_shape,
-        # normalize_pos,
-        pos_temperature,
-        embed_dim,
-    ):
-        super().__init__()
-        self.embed_dim = embed_dim
-        # self.sparse_shape = sparse_shape
-        # self.normalize_pos = normalize_pos
-        self.pos_temperature = pos_temperature
-
-    def forward(self, x, coors):
-        # size_x, size_y, size_z = self.sparse_shape
-        x, y = coors[:, 1], coors[:, 2]
-
-        # if self.normalize_pos:
-        #     x = x / size_x * 2 * 3.1415  # [-pi, pi]
-        #     y = y / size_y * 2 * 3.1415  # [-pi, pi]
-
-        inv_freq = self.inv_freq
-
-        # [num_tokens, pos_length]
-        pex = x[:, None] / inv_freq[None, :]
-        pey = y[:, None] / inv_freq[None, :]
-
-        # [num_tokens, pos_length]
-        pex = torch.stack([pex[:, ::2].sin(), pex[:, 1::2].cos()], dim=-1).flatten(1)
-        pey = torch.stack([pey[:, ::2].sin(), pey[:, 1::2].cos()], dim=-1).flatten(1)
-        pe = torch.cat([pex, pey], dim=-1).to(x.dtype)
-
-        # gap = self.feat_dim - pe.size(1)
-        # if gap > 0:
-        #     pe_p = torch.zeros((pe.size(0), gap), dtype=dtype, device=coors.device)
-        #     pe = torch.cat([pe, pe_p], dim=1)
-
-        return pe
-
-    @cached_property
-    def inv_freq(self):
-        ndim = 2
-        pos_length = (self.embed_dim // (ndim * 2)) * 2
-
-        # [pos_length]
-        inv_freq = torch.arange(pos_length, dtype=torch.float32, device="cuda")
-        inv_freq = self.pos_temperature ** (2 * (inv_freq // 2) / pos_length)
-        print(f'Inv freq shape: {inv_freq.shape}')
-        return inv_freq
-

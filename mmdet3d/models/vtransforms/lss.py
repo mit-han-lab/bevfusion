@@ -74,7 +74,5 @@ class LSSTransform(BaseTransform):
 
     def forward(self, *args, **kwargs):
         x = super().forward(*args, **kwargs)
-        # print(type(x))
-
         x = self.downsample(x)
         return x
