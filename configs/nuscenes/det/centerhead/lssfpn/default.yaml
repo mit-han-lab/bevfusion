@@ -1,12 +1,12 @@
 
-data:
-  train:
-    dataset:
-      ann_file: nuscenes_radar/nuscenes_radar_infos_train_radar.pkl
-  val:
-    ann_file: nuscenes_radar/nuscenes_radar_infos_val_radar.pkl
-  test:
-    ann_file: nuscenes_radar/nuscenes_radar_infos_val_radar.pkl
+# data:
+#   train:
+#     dataset:
+#       ann_file: nuscenes_radar/nuscenes_radar_infos_train_radar.pkl
+#   val:
+#     ann_file: nuscenes_radar/nuscenes_radar_infos_val_radar.pkl
+#   test:
+#     ann_file: nuscenes_radar/nuscenes_radar_infos_val_radar.pkl
 
 model:
   decoder:
