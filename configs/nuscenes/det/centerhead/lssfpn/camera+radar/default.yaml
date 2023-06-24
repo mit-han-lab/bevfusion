@@ -1,14 +1,13 @@
-radar_sweeps: 6
-radar_max_points: 2500
-radar_use_dims: [0, 1, 2, 5, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56]
-radar_compensate_velocity: true 
-radar_filtering: none
 
-radar_voxel_size: [0.8, 0.8, 8]
-image_size: [256, 704]
-radar_jitter: 0
-radar_normalize: false
-
+data:
+  train:
+    dataset:
+      ann_file: nuscenes_radar/nuscenes_radar_infos_train_radar.pkl
+  val:
+    ann_file: nuscenes_radar/nuscenes_radar_infos_val_radar.pkl
+  test:
+    ann_file: nuscenes_radar/nuscenes_radar_infos_val_radar.pkl
+    
 augment2d:
   resize: [[0.38, 0.55], [0.48, 0.48]]
 
@@ -16,8 +15,6 @@ augment3d:
   scale: [0.9, 1.1]
   rotate: [0, 0]
   translate: 0.5
-
-gt_paste_stop_epoch: 15
 
 model:
   encoders:
@@ -30,7 +27,31 @@ model:
         ybound: [-51.2, 51.2, 0.8]
         zbound: [-10.0, 10.0, 20.0]
         dbound: [1.0, 60.0, 1.0]
-    radar: null
+    radar:
+      voxelize_reduce: false
+      voxelize:
+        max_num_points: 20
+        point_cloud_range: ${point_cloud_range}
+        voxel_size: ${radar_voxel_size}
+        max_voxels: [30000, 60000]
+      backbone:
+        type: RadarEncoder
+        pts_voxel_encoder:
+          type: RadarFeatureNet
+          in_channels: 45
+          feat_channels: [128, 128, 128, 64]
+          with_distance: false
+          point_cloud_range: ${point_cloud_range}
+          voxel_size: ${radar_voxel_size}
+          norm_cfg:
+            type: BN1d
+            eps: 1.0e-3
+            momentum: 0.01
+        pts_middle_encoder:
+          type: PointPillarsScatter
+          in_channels: 64
+          output_shape: [128, 128]
+        pts_bev_encoder: null
   heads:
     object:
       test_cfg:
@@ -49,229 +70,3 @@ model:
           - [1.0, 1.0]
           - [2.5, 4.0]
 
-
-data:
-  train:
-    dataset:
-      ann_file: nuscenes_radar/nuscenes_radar_infos_train_radar.pkl
-  val:
-    ann_file: nuscenes_radar/nuscenes_radar_infos_val_radar.pkl
-  test:
-    ann_file: nuscenes_radar/nuscenes_radar_infos_val_radar.pkl
-    
-train_pipeline:
-  -
-    type: LoadMultiViewImageFromFiles
-    to_float32: true
-  -
-    type: LoadPointsFromFile
-    coord_type: LIDAR
-    load_dim: ${load_dim}
-    use_dim: ${use_dim}
-    reduce_beams: ${reduce_beams}
-    load_augmented: ${load_augmented}
-  -
-    type: LoadPointsFromMultiSweeps
-    sweeps_num: 0
-    load_dim: ${load_dim}
-    use_dim: ${use_dim}
-    reduce_beams: ${reduce_beams}
-    pad_empty_sweeps: true
-    remove_close: true
-    load_augmented: ${load_augmented}
-  -
-    type: LoadRadarPointsMultiSweeps
-    load_dim: 18
-    sweeps_num: ${radar_sweeps}
-    use_dim: ${radar_use_dims}
-    max_num: ${radar_max_points}
-    compensate_velocity: ${radar_compensate_velocity}
-    filtering: ${radar_filtering}
-    normalize: ${radar_normalize}
-  -
-    type: LoadAnnotations3D
-    with_bbox_3d: true
-    with_label_3d: true
-    with_attr_label: False
-  -
-    type: ObjectPaste
-    stop_epoch: ${gt_paste_stop_epoch}
-    db_sampler:
-      dataset_root: ${dataset_root}
-      info_path: ${'data/nuscenes/' + "nuscenes_dbinfos_train.pkl"}
-      rate: 1.0
-      prepare: 
-        filter_by_difficulty: [-1]
-        filter_by_min_points:
-          car: 5
-          truck: 5
-          bus: 5
-          trailer: 5
-          construction_vehicle: 5
-          traffic_cone: 5
-          barrier: 5
-          motorcycle: 5
-          bicycle: 5
-          pedestrian: 5
-      classes: ${object_classes}
-      sample_groups:
-        car: 2
-        truck: 3
-        construction_vehicle: 7
-        bus: 4
-        trailer: 6
-        barrier: 2
-        motorcycle: 6
-        bicycle: 6
-        pedestrian: 2
-        traffic_cone: 2
-      points_loader:
-        type: LoadPointsFromFile
-        coord_type: LIDAR
-        load_dim: ${load_dim}
-        use_dim: ${use_dim}
-        reduce_beams: ${reduce_beams}
-  -
-    type: ImageAug3D
-    final_dim: ${image_size}
-    resize_lim: ${augment2d.resize[0]}
-    bot_pct_lim: [0.0, 0.0]
-    rot_lim: ${augment2d.rotate}
-    rand_flip: true
-    is_train: true
-  -
-    type: GlobalRotScaleTrans
-    resize_lim: ${augment3d.scale}
-    rot_lim: ${augment3d.rotate}
-    trans_lim: ${augment3d.translate}
-    is_train: true
-  -
-    type: RandomFlip3D
-  -
-    type: PointsRangeFilter
-    point_cloud_range: ${point_cloud_range}
-  -
-    type: ObjectRangeFilter
-    point_cloud_range: ${point_cloud_range}
-  -
-    type: ObjectNameFilter
-    classes: ${object_classes}
-  -
-    type: ImageNormalize
-    mean: [0.485, 0.456, 0.406]
-    std: [0.229, 0.224, 0.225]
-  - 
-    type: GridMask
-    use_h: true
-    use_w: true
-    max_epoch: ${max_epochs}
-    rotate: 1
-    offset: false
-    ratio: 0.5
-    mode: 1
-    prob: ${augment2d.gridmask.prob}
-    fixed_prob: ${augment2d.gridmask.fixed_prob}
-  -
-    type: PointShuffle
-  -
-    type: DefaultFormatBundle3D
-    classes: ${object_classes}
-  -
-    type: Collect3D
-    keys:
-      - img
-      - points
-      - radar
-      - gt_bboxes_3d
-      - gt_labels_3d
-    meta_keys:
-      - camera_intrinsics
-      - camera2ego
-      - lidar2ego
-      - lidar2camera
-      - lidar2image
-      - camera2lidar
-      - img_aug_matrix
-      - lidar_aug_matrix
-  -
-    type: GTDepth
-    keyframe_only: true 
-
-test_pipeline:
-  -
-    type: LoadMultiViewImageFromFiles
-    to_float32: true
-  -
-    type: LoadPointsFromFile
-    coord_type: LIDAR
-    load_dim: ${load_dim}
-    use_dim: ${use_dim}
-    reduce_beams: ${reduce_beams}
-    load_augmented: ${load_augmented}
-  -
-    type: LoadPointsFromMultiSweeps
-    sweeps_num: 9
-    load_dim: ${load_dim}
-    use_dim: ${use_dim}
-    reduce_beams: ${reduce_beams}
-    pad_empty_sweeps: true
-    remove_close: true
-    load_augmented: ${load_augmented}
-  -
-    type: LoadRadarPointsMultiSweeps
-    load_dim: 18
-    sweeps_num: ${radar_sweeps}
-    use_dim: ${radar_use_dims}
-    max_num: ${radar_max_points}
-    compensate_velocity: ${radar_compensate_velocity}
-    filtering: ${radar_filtering}
-    normalize: ${radar_normalize}
-  -
-    type: LoadAnnotations3D
-    with_bbox_3d: true
-    with_label_3d: true
-    with_attr_label: False
-  -
-    type: ImageAug3D
-    final_dim: ${image_size}
-    resize_lim: ${augment2d.resize[1]}
-    bot_pct_lim: [0.0, 0.0]
-    rot_lim: [0.0, 0.0]
-    rand_flip: false
-    is_train: false
-  -
-    type: GlobalRotScaleTrans
-    resize_lim: [1.0, 1.0]
-    rot_lim: [0.0, 0.0]
-    trans_lim: 0.0
-    is_train: false
-  -
-    type: PointsRangeFilter
-    point_cloud_range: ${point_cloud_range}
-  -
-    type: ImageNormalize
-    mean: [0.485, 0.456, 0.406]
-    std: [0.229, 0.224, 0.225]
-  -
-    type: DefaultFormatBundle3D
-    classes: ${object_classes}
-  -
-    type: Collect3D
-    keys:
-      - img
-      - points
-      - radar
-      - gt_bboxes_3d
-      - gt_labels_3d
-    meta_keys:
-      - camera_intrinsics
-      - camera2ego
-      - lidar2ego
-      - lidar2camera
-      - lidar2image
-      - camera2lidar
-      - img_aug_matrix
-      - lidar_aug_matrix
-  -
-    type: GTDepth
-    keyframe_only: true 

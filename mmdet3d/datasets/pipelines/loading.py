@@ -263,7 +263,6 @@ class LoadBEVSegmentation:
             self.maps[location] = NuScenesMap(dataset_root, location)
 
     def __call__(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        # print(data.keys())
         lidar2point = data["lidar_aug_matrix"]
         point2lidar = np.linalg.inv(lidar2point)
         lidar2ego = data["lidar2ego"]
@@ -629,7 +628,7 @@ class LoadRadarPointsMultiSweeps(object):
 
     def perform_encodings(self, points, encoding):
         for idx, encoding_type, encoding_dims in self.encoding:
-            # print(f'Performing {encoding_type} encoding on idx {idx}, generating an additional {encoding_dims} dims')
+
             assert encoding_type in ['one-hot', 'ordinal', 'nusc-filter']
 
             feat = points[:, idx]
@@ -728,24 +727,19 @@ class LoadRadarPointsMultiSweeps(object):
         """
         radars_dict = results['radar']
 
-        # print("HERE")
-        # print(radars_dict.keys())
-
         points_sweep_list = []
         for key, sweeps in radars_dict.items():
-            # print(len(sweeps))
             if len(sweeps) < self.sweeps_num:
                 idxes = list(range(len(sweeps)))
             else:
                 idxes = list(range(self.sweeps_num))
-            # print(idxes, key)
+
             ts = sweeps[0]['timestamp'] * 1e-6
             for idx in idxes:
                 sweep = sweeps[idx]
 
                 points_sweep = self._load_points(sweep['data_path'])
                 points_sweep = np.copy(points_sweep).reshape(-1, self.load_dim)
-                # print(points_sweep.shape)
 
                 timestamp = sweep['timestamp'] * 1e-6
                 time_diff = ts - timestamp
@@ -781,13 +775,8 @@ class LoadRadarPointsMultiSweeps(object):
                 points_sweep_list.append(points_sweep_)
         
         points = np.concatenate(points_sweep_list, axis=0)
-
         points = self.perform_encodings(points, self.encoding)
-
-        # print(points.shape)
-        
         points = points[:, self.use_dim]
-        # print(points.shape)
 
         if self.normalize:
             points = self.normalize_feats(points, self.normalize_dims)

@@ -9,8 +9,7 @@ model:
         type: ResNet
         depth: 50
         num_stages: 4
-        # out_indices: [1, 2, 3] # This one is for the LSSFPN neck
-        out_indices: [0, 1, 2, 3] # This one is for the SecondFPN neck
+        out_indices: [0, 1, 2, 3] 
         norm_cfg:
           type: BN2d
           requires_grad: true
@@ -22,12 +21,7 @@ model:
         type: SECONDFPN
         in_channels: [256, 512, 1024, 2048]
         out_channels: [128, 128, 128, 128]
-        upsample_strides: [0.25, 0.5, 1, 2]
-      # neck:
-      #   type: LSSFPN
-      #   in_indices: [-1, -2]
-      #   in_channels: [2048, 1024]
-      #   out_channels: 512        
+        upsample_strides: [0.25, 0.5, 1, 2]    
       vtransform:
         type: LSSTransform
         in_channels: 512
@@ -39,31 +33,6 @@ model:
         zbound: [-10.0, 10.0, 20.0]
         dbound: [1.0, 60.0, 1.0]
         downsample: 1
-    radar:
-      voxelize_reduce: false
-      voxelize:
-        max_num_points: 20
-        point_cloud_range: ${point_cloud_range}
-        voxel_size: ${radar_voxel_size}
-        max_voxels: [30000, 60000]
-      backbone:
-        type: RadarEncoder
-        pts_voxel_encoder:
-          type: RadarFeatureNet
-          in_channels: 45
-          feat_channels: [128, 128, 128, 64]
-          with_distance: false
-          point_cloud_range: ${point_cloud_range}
-          voxel_size: ${radar_voxel_size}
-          norm_cfg:
-            type: BN1d
-            eps: 1.0e-3
-            momentum: 0.01
-        pts_middle_encoder:
-          type: PointPillarsScatter
-          in_channels: 64
-          output_shape: [128, 128]
-        pts_bev_encoder: null
   decoder:
     backbone:
       type: GeneralizedResNet
@@ -81,7 +50,7 @@ model:
   heads:
     object:
       train_cfg:
-        code_weights: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 3.0, 3.0]
+        code_weights: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
   fuser:
     type: ConvFuser
     in_channels: [64, 64]

@@ -1,3 +1,13 @@
+
+data:
+  train:
+    dataset:
+      ann_file: nuscenes_radar/nuscenes_radar_infos_train_radar.pkl
+  val:
+    ann_file: nuscenes_radar/nuscenes_radar_infos_val_radar.pkl
+  test:
+    ann_file: nuscenes_radar/nuscenes_radar_infos_val_radar.pkl
+
 model:
   decoder:
     backbone:
@@ -21,6 +31,12 @@ optimizer:
   type: AdamW
   lr: 2.0e-4
   weight_decay: 0.01
+  paramwise_cfg:
+    custom_keys:
+      absolute_pos_embed: 
+        decay_mult: 0
+      relative_position_bias_table:
+        decay_mult: 0
 
 optimizer_config:
   grad_clip:

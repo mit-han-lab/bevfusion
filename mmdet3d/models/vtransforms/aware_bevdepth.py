@@ -272,28 +272,12 @@ class DepthNet(nn.Module):
 
     @force_fp32()
     def forward(self, x, mats_dict):
-        # print(mats_dict['intrin_mats'].shape)
-        # print(mats_dict['ida_mats'].shape)
-        # print(mats_dict['bda_mat'].shape)
-        # print(mats_dict['sensor2ego_mats'].shape)
-
         intrins = mats_dict['intrin_mats'][:, ..., :3, :3]
         batch_size = intrins.shape[0]
         num_cams = intrins.shape[1]
         ida = mats_dict['ida_mats'][:, ...]
         sensor2ego = mats_dict['sensor2ego_mats'][:, ..., :3, :]
         bda = mats_dict['bda_mat'].view(batch_size, 1, 4, 4).repeat(1, num_cams, 1, 1)
-
-        # print('post')
-        # print(intrins.shape)
-        # print(ida.shape)
-        # print(sensor2ego.shape)
-        # print(bda.shape)
-
-        # torch.Size([4, 6, 3, 3])                                                                                                                                      
-        # torch.Size([4, 6, 4, 4])                                                                                                                                      
-        # torch.Size([4, 6, 3, 4])                                                                                                                                      
-        # torch.Size([4, 6, 4, 4]) 
 
         # If exporting, cache the MLP input, since it's based on 
         # intrinsics and data augmentation, which are constant at inference time. 
@@ -336,7 +320,7 @@ class DepthNet(nn.Module):
         depth = self.depth_conv_1(depth) 
         depth = self.depth_conv_2(depth)
         depth = self.depth_conv_3(depth) 
-        # print(depth.max(), context.max())
+
         return torch.cat([depth, context], dim=1)
 
 
@@ -376,9 +360,7 @@ class AwareBEVDepth(BaseTransform):
             self.refinement = DepthRefinement(self.C, self.C, self.C)
 
         self.depth_channels = self.frustum.shape[0]
-        # self.depthnet = nn.Conv2d(in_channels, self.D + self.C, 1)
 
-        # in_channels = mid_channels = 512
         mid_channels = in_channels
         self.depthnet = DepthNet(
             in_channels, 
@@ -424,10 +406,7 @@ class AwareBEVDepth(BaseTransform):
         x = self.depthnet(x, mats_dict)
         depth = x[:, : self.D].softmax(dim=1)
 
-        # torch.save(depth.max(dim=1)[0], 'debug/depths.pth')
-        # print(depth.shape)
         x = depth.unsqueeze(1) * x[:, self.D : (self.D + self.C)].unsqueeze(2)
-        # print(x.shape)
 
         if self.bevdepth_refine:
             x = x.permute(0, 3, 1, 4, 2).contiguous() # [n, c, d, h, w] -> [n, h, c, w, d]
@@ -446,22 +425,10 @@ class AwareBEVDepth(BaseTransform):
             # only key-frame will calculate depth loss
             depth_labels = depth_labels[:, 0, ...]
 
-        # print(depth_labels.shape, depth_preds.shape)
-        # torch.Size([4, 3, 256, 704]) torch.Size([24, 59, 16, 44])
-        # cameras*batch, dbound, downsampled 16
-
-        # torch.Size([4, 6, 512, 16, 44]) 
-
         depth_labels = self.get_downsampled_gt_depth(depth_labels)
         depth_preds = depth_preds.permute(0, 2, 3, 1).contiguous().view(
             -1, self.depth_channels)
         fg_mask = torch.max(depth_labels, dim=1).values > 0.0
-
-        # print(depth_labels.shape, depth_preds.shape)
-        # torch.Size([16896, 59]) torch.Size([16896, 59]) 
-
-        # print(depth_preds.max(), depth_labels.max())
-        # print()
 
         with autocast(enabled=False):
             depth_loss = (F.binary_cross_entropy(
@@ -667,12 +634,6 @@ class AwareDBEVDepth(BaseDepthTransform):
         # if len(depth_labels.shape) == 5:
         #     # only key-frame will calculate depth loss
         #     depth_labels = depth_labels[:, 0, ...]
-
-        # print(depth_labels.shape, depth_preds.shape)
-        # torch.Size([4, 3, 256, 704]) torch.Size([24, 59, 16, 44])
-        # cameras*batch, dbound, downsampled 16
-
-        # torch.Size([4, 6, 512, 16, 44]) 
 
         depth_labels = self.get_downsampled_gt_depth(depth_labels)
         depth_preds = depth_preds.permute(0, 2, 3, 1).contiguous().view(
