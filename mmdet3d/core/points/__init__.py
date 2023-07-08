@@ -2,8 +2,9 @@ from .base_points import BasePoints
 from .cam_points import CameraPoints
 from .depth_points import DepthPoints
 from .lidar_points import LiDARPoints
+from .radar_points import RadarPoints
 
-__all__ = ["BasePoints", "CameraPoints", "DepthPoints", "LiDARPoints"]
+__all__ = ["BasePoints", "CameraPoints", "DepthPoints", "LiDARPoints", "RadarPoints"]
 
 
 def get_points_type(points_type):

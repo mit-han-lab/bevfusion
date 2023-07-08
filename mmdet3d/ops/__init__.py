@@ -9,6 +9,7 @@ from mmcv.ops import (
 )
 
 from .ball_query import ball_query
+from .feature_decorator import feature_decorator
 from .furthest_point_sample import (
     Points_Sampler,
     furthest_point_sample,
@@ -89,4 +90,5 @@ __all__ = [
     "PAConvCUDASAModule",
     "PAConvCUDASAModuleMSG",
     "bev_pool",
+    "feature_decorator",
 ]

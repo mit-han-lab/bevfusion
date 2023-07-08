@@ -1,3 +1,5 @@
+gt_paste_stop_epoch: 15
+
 model:
   heads:
     object:

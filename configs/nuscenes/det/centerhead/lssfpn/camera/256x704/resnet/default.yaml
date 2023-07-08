@@ -1,0 +1,45 @@
+model:
+  encoders:
+    camera:
+      backbone:
+        type: ResNet
+        depth: 50
+        num_stages: 4
+        out_indices: [0, 1, 2, 3]
+        norm_cfg:
+          type: BN2d
+          requires_grad: true
+        norm_eval: false
+        init_cfg:
+          type: Pretrained
+          checkpoint: torchvision://resnet50
+      neck:
+        type: SECONDFPN
+        in_channels: [256, 512, 1024, 2048]
+        out_channels: [128, 128, 128, 128]
+        upsample_strides: [0.25, 0.5, 1, 2]    
+      vtransform:
+        type: LSSTransform
+        in_channels: 512
+        out_channels: 64
+        image_size: ${image_size}
+        feature_size: ${[image_size[0] // 16, image_size[1] // 16]}
+        xbound: [-51.2, 51.2, 0.8]
+        ybound: [-51.2, 51.2, 0.8]
+        zbound: [-10.0, 10.0, 20.0]
+        dbound: [1.0, 60.0, 1.0]
+        downsample: 1
+  decoder:
+    backbone:
+      type: GeneralizedResNet
+      in_channels: 64
+      blocks:
+        - [2, 128, 2]
+        - [2, 256, 2]
+        - [2, 512, 1]
+    neck:
+      type: LSSFPN
+      in_indices: [-1, 0]
+      in_channels: [512, 128]
+      out_channels: 256
+      scale_factor: 2

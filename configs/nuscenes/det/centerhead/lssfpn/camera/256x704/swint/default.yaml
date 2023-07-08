@@ -82,4 +82,4 @@ momentum_config:
   step_ratio_up: 0.4
 
 data:
-  samples_per_gpu: 6
+  samples_per_gpu: 4
