@@ -196,6 +196,9 @@ torchpack dist-run -np 8 python tools/train.py configs/nuscenes/seg/fusion-bev25
 
 Note: please run `tools/test.py` separately after training to get the final evaluation metrics.
 
+## Deployment on TensorRT
+[CUDA-BEVFusion](https://github.com/NVIDIA-AI-IOT/Lidar_AI_Solution/tree/master/CUDA-BEVFusion): Best practice for TensorRT, which provides INT8 acceleration solutions (PTQ and QAT) and achieves 25fps on ORIN.
+
 ## FAQs
 
 Q: Can we directly use the info files prepared by mmdetection3d?
