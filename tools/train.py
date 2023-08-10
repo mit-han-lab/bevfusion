@@ -1,6 +1,7 @@
 import argparse
 import copy
 import os
+import pdb
 import random
 import time
 
@@ -40,6 +41,7 @@ def main():
     cfg.run_dir = args.run_dir
 
     # dump config
+    pdb.set_trace()
     cfg.dump(os.path.join(cfg.run_dir, "configs.yaml"))
 
     # init the logger before other steps
@@ -65,6 +67,7 @@ def main():
 
     datasets = [build_dataset(cfg.data.train)]
 
+    pdb.set_trace()
     model = build_model(cfg.model)
     model.init_weights()
     if cfg.get("sync_bn", None):

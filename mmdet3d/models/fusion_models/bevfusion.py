@@ -1,3 +1,4 @@
+import pdb
 from typing import Any, Dict
 
 import torch
@@ -33,6 +34,7 @@ class BEVFusion(Base3DFusionModel):
     ) -> None:
         super().__init__()
 
+        pdb.set_trace()
         self.encoders = nn.ModuleDict()
         if encoders.get("camera") is not None:
             self.encoders["camera"] = nn.ModuleDict(

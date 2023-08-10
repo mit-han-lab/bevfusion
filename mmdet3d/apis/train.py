@@ -1,3 +1,5 @@
+import pdb
+
 import torch
 from mmcv.parallel import MMDistributedDataParallel
 from mmcv.runner import (
@@ -28,7 +30,7 @@ def train_model(
 
     # prepare data loaders
     dataset = dataset if isinstance(dataset, (list, tuple)) else [dataset]
-
+    pdb.set_trace()
     data_loaders = [
         build_dataloader(
             ds,

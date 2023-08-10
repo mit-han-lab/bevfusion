@@ -1,5 +1,5 @@
 import argparse
-
+from os import path as osp
 from data_converter import nuscenes_converter as nuscenes_converter
 from data_converter.create_gt_database import create_groundtruth_database
 
@@ -26,6 +26,8 @@ def nuscenes_data_prep(
         out_dir (str): Output directory of the groundtruth database info.
         max_sweeps (int): Number of input consecutive frames. Default: 10
     """
+    # debug
+    print("enter data prep")
     if load_augmented is None:
         # otherwise, infos must have been created, we just skip.
         nuscenes_converter.create_nuscenes_infos(
@@ -89,15 +91,18 @@ parser.add_argument(
 args = parser.parse_args()
 
 if __name__ == "__main__":
+    # debug
+    print("enter main()")
     load_augmented = None
     if args.virtual:
         if args.painted:
             load_augmented = "mvp"
         else:
             load_augmented = "pointpainting"
-
     if args.dataset == "nuscenes" and args.version != "v1.0-mini":
         train_version = f"{args.version}-trainval"
+        # debug
+        print(f"{train_version} train data")
         nuscenes_data_prep(
             root_path=args.root_path,
             info_prefix=args.extra_tag,
