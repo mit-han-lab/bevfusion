@@ -132,3 +132,8 @@ dmypy.json
 models/*
 data/*
 runs/*
+
+# IDE, nuscens, pretrained
+.idea/
+nuscenes/
+pretrained/
