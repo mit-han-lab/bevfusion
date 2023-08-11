@@ -8,6 +8,7 @@ __pycache__/
 
 # Distribution / packaging
 .Python
+pretrained/
 build/
 develop-eggs/
 dist/
@@ -127,3 +128,10 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Models and data
+models/*
+data/*
+runs/*
+
+.idea/
