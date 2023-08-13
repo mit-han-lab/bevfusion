@@ -8,6 +8,7 @@ __pycache__/
 
 # Distribution / packaging
 .Python
+pretrained/
 build/
 develop-eggs/
 dist/
@@ -132,3 +133,7 @@ dmypy.json
 models/*
 data/*
 runs/*
+
+# Editor
+.idea/
+
