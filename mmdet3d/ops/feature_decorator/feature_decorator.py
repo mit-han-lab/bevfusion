@@ -1,6 +1,5 @@
 import torch
-
-# from mmdet3d.ops.feature_decorator import feature_decorator_ext
+# from . import feature_decorator_ext
 
 
 __all__ = ["feature_decorator"]

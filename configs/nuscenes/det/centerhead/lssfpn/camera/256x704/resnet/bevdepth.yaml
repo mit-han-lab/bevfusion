@@ -1,0 +1,16 @@
+model:
+  encoders:
+    camera:
+      vtransform:
+        type: AwareBEVDepth
+        bevdepth_downsample: 16
+        bevdepth_refine: false
+        depth_loss_factor: 3.0
+        in_channels: 512
+        out_channels: 64
+        feature_size: ${[image_size[0] // 16, image_size[1] // 16]}
+        xbound: [-51.2, 51.2, 0.8]
+        ybound: [-51.2, 51.2, 0.8]
+        zbound: [-10.0, 10.0, 20.0]
+        dbound: [1.0, 60.0, 1.0]
+        downsample: 1

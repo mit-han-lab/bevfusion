@@ -183,6 +183,9 @@ train_pipeline:
       - lidar2image
       - img_aug_matrix
       - lidar_aug_matrix
+  -
+    type: GTDepth
+    keyframe_only: true 
 
 test_pipeline:
   -
@@ -256,6 +259,9 @@ test_pipeline:
       - lidar2image
       - img_aug_matrix
       - lidar_aug_matrix
+  -
+    type: GTDepth
+    keyframe_only: true 
 
 data:
   samples_per_gpu: 4

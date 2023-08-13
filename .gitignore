@@ -134,4 +134,6 @@ models/*
 data/*
 runs/*
 
+# Editor
 .idea/
+

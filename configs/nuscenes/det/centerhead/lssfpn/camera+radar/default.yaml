@@ -1,0 +1,72 @@
+
+data:
+  train:
+    dataset:
+      ann_file: nuscenes_radar/nuscenes_radar_infos_train_radar.pkl
+  val:
+    ann_file: nuscenes_radar/nuscenes_radar_infos_val_radar.pkl
+  test:
+    ann_file: nuscenes_radar/nuscenes_radar_infos_val_radar.pkl
+    
+augment2d:
+  resize: [[0.38, 0.55], [0.48, 0.48]]
+
+augment3d:
+  scale: [0.9, 1.1]
+  rotate: [0, 0]
+  translate: 0.5
+
+model:
+  encoders:
+    lidar: null
+    camera:
+      vtransform:
+        type: LSSTransform
+        image_size: ${image_size}
+        xbound: [-51.2, 51.2, 0.8]
+        ybound: [-51.2, 51.2, 0.8]
+        zbound: [-10.0, 10.0, 20.0]
+        dbound: [1.0, 60.0, 1.0]
+    radar:
+      voxelize_reduce: false
+      voxelize:
+        max_num_points: 20
+        point_cloud_range: ${point_cloud_range}
+        voxel_size: ${radar_voxel_size}
+        max_voxels: [30000, 60000]
+      backbone:
+        type: RadarEncoder
+        pts_voxel_encoder:
+          type: RadarFeatureNet
+          in_channels: 45
+          feat_channels: [128, 128, 128, 64]
+          with_distance: false
+          point_cloud_range: ${point_cloud_range}
+          voxel_size: ${radar_voxel_size}
+          norm_cfg:
+            type: BN1d
+            eps: 1.0e-3
+            momentum: 0.01
+        pts_middle_encoder:
+          type: PointPillarsScatter
+          in_channels: 64
+          output_shape: [128, 128]
+        pts_bev_encoder: null
+  heads:
+    object:
+      test_cfg:
+        nms_type:
+          - circle
+          - rotate
+          - rotate
+          - circle
+          - rotate
+          - rotate
+        nms_scale:
+          - [1.0]
+          - [1.0, 1.0]
+          - [1.0, 1.0]
+          - [1.0]
+          - [1.0, 1.0]
+          - [2.5, 4.0]
+
