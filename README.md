@@ -141,7 +141,7 @@ We also provide instructions for evaluating our pretrained models. Please downlo
 Then, you will be able to run:
 
 ```bash
-torchpack dist-run -np 8 python tools/test.py [config file path] pretrained/[checkpoint name].pth --eval [evaluation type]
+torchpack dist-run -np [number of gpus] python tools/test.py [config file path] pretrained/[checkpoint name].pth --eval [evaluation type]
 ```
 
 For example, if you want to evaluate the detection variant of BEVFusion, you can try:
