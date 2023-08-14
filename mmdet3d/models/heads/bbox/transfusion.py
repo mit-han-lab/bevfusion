@@ -721,13 +721,15 @@ class TransFusionHead(nn.Module):
         """
         rets = []
         for layer_id, preds_dict in enumerate(preds_dicts):
+            # batch size와 score
             batch_size = preds_dict[0]["heatmap"].shape[0]
-            batch_score = preds_dict[0]["heatmap"][..., -self.num_proposals :].sigmoid()
+            batch_score = preds_dict[0]["heatmap"][..., -self.num_proposals :].sigmoid()    # sigmoid: 0과 1사이의 값 출력
             # if self.loss_iou.loss_weight != 0:
             #    batch_score = torch.sqrt(batch_score * preds_dict[0]['iou'][..., -self.num_proposals:].sigmoid())
             one_hot = F.one_hot(
                 self.query_labels, num_classes=self.num_classes
             ).permute(0, 2, 1)
+            # 객체가 존재할 확률에 가중치 곱해서 정확도 향상
             batch_score = batch_score * preds_dict[0]["query_heatmap_score"] * one_hot
 
             batch_center = preds_dict[0]["center"][..., -self.num_proposals :]
@@ -748,6 +750,7 @@ class TransFusionHead(nn.Module):
                 filter=True,
             )
 
+            # 데이터 처리: nuScenes 데이터 사용
             if self.test_cfg["dataset"] == "nuScenes":
                 self.tasks = [
                     dict(
@@ -778,6 +781,7 @@ class TransFusionHead(nn.Module):
                     dict(num_class=1, class_names=["Cyclist"], indices=[2], radius=0.7),
                 ]
 
+            # 객체 필터링하고 NMS 적용하여 확률높은 객체 저장
             ret_layer = []
             for i in range(batch_size):
                 boxes3d = temp[i]["bboxes"]
@@ -792,6 +796,7 @@ class TransFusionHead(nn.Module):
                             task_mask += labels == cls_idx
                         task_mask = task_mask.bool()
                         if task["radius"] > 0:
+                            # circle nms
                             if self.test_cfg["nms_type"] == "circle":
                                 boxes_for_nms = torch.cat(
                                     [
@@ -806,6 +811,7 @@ class TransFusionHead(nn.Module):
                                         task["radius"],
                                     )
                                 )
+                            # circle nms가 아닐 경우(rectangle nms)
                             else:
                                 boxes_for_nms = xywhr2xyxyr(
                                     metas[i]["box_type_3d"](
@@ -820,6 +826,7 @@ class TransFusionHead(nn.Module):
                                     pre_maxsize=self.test_cfg["pre_maxsize"],
                                     post_max_size=self.test_cfg["post_maxsize"],
                                 )
+                        # radius가 0 이하일 경우
                         else:
                             task_keep_indices = torch.arange(task_mask.sum())
                         if task_keep_indices.shape[0] != 0:
@@ -833,12 +840,13 @@ class TransFusionHead(nn.Module):
                         scores=scores[keep_mask],
                         labels=labels[keep_mask],
                     )
-                else:  # no nms
+                else:  # no nms: nms가 없을 경우
                     ret = dict(bboxes=boxes3d, scores=scores, labels=labels)
                 ret_layer.append(ret)
             rets.append(ret_layer)
         assert len(rets) == 1
         assert len(rets[0]) == 1
+        # data에 대한 점수와 라벨 반환
         res = [
             [
                 metas[0]["box_type_3d"](

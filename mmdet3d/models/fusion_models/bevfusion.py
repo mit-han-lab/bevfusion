@@ -339,11 +339,14 @@ class BEVFusion(Base3DFusionModel):
         x = self.decoder["backbone"](x)
         x = self.decoder["neck"](x)
 
+        # training일 경우
         if self.training:
             outputs = {}
+            # 예상 데이터 값
+            # heads = {map: null, object:[activation: relu, ..., type: TransFusionHead]}
             for type, head in self.heads.items():
                 if type == "object":
-                    pred_dict = head(x, metas)
+                    pred_dict = head(x, metas)    # pred_dict: 예측값
                     losses = head.loss(gt_bboxes_3d, gt_labels_3d, pred_dict)
                 elif type == "map":
                     losses = head(x, gt_masks_bev)
@@ -360,6 +363,8 @@ class BEVFusion(Base3DFusionModel):
                 else:
                     raise ValueError('Use depth loss is true, but depth loss not found')
             return outputs
+        
+        # training이 아닐 경우
         else:
             outputs = [{} for _ in range(batch_size)]
             for type, head in self.heads.items():

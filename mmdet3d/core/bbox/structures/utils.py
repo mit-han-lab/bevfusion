@@ -68,6 +68,7 @@ def rotation_3d_in_axis(points, angles, axis=0):
     return torch.einsum("aij,jka->aik", (points, rot_mat_T))
 
 
+# data format 변환
 def xywhr2xyxyr(boxes_xywhr):
     """Convert a rotated boxes in XYWHR format to XYXYR format.
 

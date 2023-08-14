@@ -7,7 +7,7 @@ from .cam_box3d import CameraInstance3DBoxes
 from .depth_box3d import DepthInstance3DBoxes
 from .lidar_box3d import LiDARInstance3DBoxes
 
-
+# bbox 좌표계 변환
 @unique
 class Box3DMode(IntEnum):
     r"""Enum of different ways to represent a box.

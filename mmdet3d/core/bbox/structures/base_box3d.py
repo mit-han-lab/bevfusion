@@ -5,7 +5,7 @@ from abc import abstractmethod
 from mmdet3d.ops.iou3d import iou3d_cuda
 from .utils import limit_period, xywhr2xyxyr
 
-
+# iou 계산하는 파일
 class BaseInstance3DBoxes:
     """Base class for 3D Boxes.
 
@@ -33,12 +33,14 @@ class BaseInstance3DBoxes:
             boxes.
     """
 
+    # box_dim: 박스의 차원, with_yaw: z축, origin: box의 상대적 원점
     def __init__(self, tensor, box_dim=7, with_yaw=True, origin=(0.5, 0.5, 0)):
         if isinstance(tensor, torch.Tensor):
             device = tensor.device
         else:
             device = torch.device("cpu")
         tensor = torch.as_tensor(tensor, dtype=torch.float32, device=device)
+        # tensor의 데이터가 비어있을 경우
         if tensor.numel() == 0:
             # Use reshape, so we don't end up creating a new tensor that
             # does not depend on the inputs (and consequently confuses jit)
@@ -375,11 +377,13 @@ class BaseInstance3DBoxes:
             f"be in the same type, got {type(boxes1)} and {type(boxes2)}."
         )
 
+        # 상자들의 윗면과 아랫면 구함
         boxes1_top_height = boxes1.top_height.view(-1, 1)
         boxes1_bottom_height = boxes1.bottom_height.view(-1, 1)
         boxes2_top_height = boxes2.top_height.view(1, -1)
         boxes2_bottom_height = boxes2.bottom_height.view(1, -1)
 
+        # 두 개의 윗면 중에서 작은 값을 선택하고 두 개의 아랫면 중에서 큰 값을 선택해서 overlap을 구함
         heighest_of_bottom = torch.max(boxes1_bottom_height, boxes2_bottom_height)
         lowest_of_top = torch.min(boxes1_top_height, boxes2_top_height)
         overlaps_h = torch.clamp(lowest_of_top - heighest_of_bottom, min=0)
@@ -387,7 +391,7 @@ class BaseInstance3DBoxes:
 
     @classmethod
     def overlaps(cls, boxes1, boxes2, mode="iou"):
-        """Calculate 3D overlaps of two boxes.
+        """Calculate 3D overlaps of two boxes.    ->  3D iou 계산
 
         Note:
             This function calculates the overlaps between ``boxes1`` and
@@ -412,17 +416,18 @@ class BaseInstance3DBoxes:
 
         rows = len(boxes1)
         cols = len(boxes2)
+        # 0일 경우 겹친 곳이 없으므로 빈 결과를 반환
         if rows * cols == 0:
             return boxes1.tensor.new(rows, cols)
 
-        # height overlap
+        # height overlap    -> 높이 overlaps 계산
         overlaps_h = cls.height_overlaps(boxes1, boxes2)
 
-        # obtain BEV boxes in XYXYR format
+        # obtain BEV boxes in XYXYR format    -> 데이터 format 변환
         boxes1_bev = xywhr2xyxyr(boxes1.bev)
         boxes2_bev = xywhr2xyxyr(boxes2.bev)
 
-        # bev overlap
+        # bev overlap    -> BEV평면에서의 overlap 계산
         overlaps_bev = boxes1_bev.new_zeros(
             (boxes1_bev.shape[0], boxes2_bev.shape[0])
         ).cuda()  # (N, M)
@@ -430,7 +435,7 @@ class BaseInstance3DBoxes:
             boxes1_bev.contiguous().cuda(), boxes2_bev.contiguous().cuda(), overlaps_bev
         )
 
-        # 3d overlaps
+        # 3d overlaps    -> 3D 공간에서 overlaps 계산
         overlaps_3d = overlaps_bev.to(boxes1.device) * overlaps_h
 
         volume1 = boxes1.volume.view(-1, 1)
@@ -442,6 +447,7 @@ class BaseInstance3DBoxes:
         else:
             iou3d = overlaps_3d / torch.clamp(volume1, min=1e-8)
 
+        # iou 반환
         return iou3d
 
     def new_box(self, data):
