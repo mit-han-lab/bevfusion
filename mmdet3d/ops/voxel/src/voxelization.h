@@ -21,7 +21,7 @@ std::vector<at::Tensor> dynamic_point_to_voxel_cpu(
     const at::Tensor &points, const at::Tensor &voxel_mapping,
     const std::vector<float> voxel_size, const std::vector<float> coors_range);
 
-#ifdef WITH_CUDA
+#if defined(WITH_CUDA) || defined(WITH_ROCM)
 int hard_voxelize_gpu(const at::Tensor &points, at::Tensor &voxels,
                       at::Tensor &coors, at::Tensor &num_points_per_voxel,
                       const std::vector<float> voxel_size,
@@ -62,7 +62,7 @@ inline int hard_voxelize(const at::Tensor &points, at::Tensor &voxels,
                          const int max_points, const int max_voxels,
                          const int NDim = 3, const bool deterministic = true) {
   if (points.device().is_cuda()) {
-#ifdef WITH_CUDA
+#if defined(WITH_CUDA) || defined(WITH_ROCM)
     if (deterministic) {
       return hard_voxelize_gpu(points, voxels, coors, num_points_per_voxel,
                                voxel_size, coors_range, max_points, max_voxels,
@@ -85,7 +85,7 @@ inline void dynamic_voxelize(const at::Tensor &points, at::Tensor &coors,
                              const std::vector<float> coors_range,
                              const int NDim = 3) {
   if (points.device().is_cuda()) {
-#ifdef WITH_CUDA
+#if defined(WITH_CUDA) || defined(WITH_ROCM)
     return dynamic_voxelize_gpu(points, coors, voxel_size, coors_range, NDim);
 #else
     AT_ERROR("Not compiled with GPU support");
@@ -109,7 +109,7 @@ inline std::vector<torch::Tensor> dynamic_point_to_voxel_forward(const torch::Te
                                                                  const torch::Tensor &coors,
                                                                  const std::string &reduce_type) {
   if (feats.device().is_cuda()) {
-#ifdef WITH_CUDA
+#if defined(WITH_CUDA) || defined(WITH_ROCM)
     return dynamic_point_to_voxel_forward_gpu(feats, coors, convert_reduce_type(reduce_type));
 #else
     TORCH_CHECK(false, "Not compiled with GPU support");
@@ -127,7 +127,7 @@ inline void dynamic_point_to_voxel_backward(torch::Tensor &grad_feats,
                                             const torch::Tensor &reduce_count,
                                             const std::string &reduce_type) {
   if (grad_feats.device().is_cuda()) {
-#ifdef WITH_CUDA
+#if defined(WITH_CUDA) || defined(WITH_ROCM)
     dynamic_point_to_voxel_backward_gpu(
         grad_feats, grad_reduced_feats, feats, reduced_feats, coors_idx, reduce_count,
         convert_reduce_type(reduce_type));
