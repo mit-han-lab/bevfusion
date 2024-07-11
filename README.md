@@ -9,9 +9,9 @@
 
 ## News
 
-- **(2023/1/16)** BEVFusion is accepted to ICRA 2023!
-- **(2022/8/16)** BEVFusion ranks first on [Waymo](https://waymo.com/open/challenges/2020/3d-detection/) 3D object detection leaderboard among all solutions.
-- **(2022/6/3)** BEVFusion ranks first on [nuScenes](https://nuscenes.org/object-detection?externalData=all&mapData=all&modalities=Any) 3D object detection leaderboard among all solutions.
+- **(2023/1)** BEVFusion is accepted to ICRA 2023!
+- **(2022/8)** BEVFusion ranks first on [Waymo](https://waymo.com/open/challenges/2020/3d-detection/) 3D object detection leaderboard among all solutions.
+- **(2022/6)** BEVFusion ranks first on [nuScenes](https://nuscenes.org/object-detection?externalData=all&mapData=all&modalities=Any) 3D object detection leaderboard among all solutions.
 
 ## Abstract
 
