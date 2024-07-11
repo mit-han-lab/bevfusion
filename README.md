@@ -6,7 +6,7 @@
 
 ## News
 
-- **(2024/5)** [NVIDIA DeepStream](https://developer.nvidia.com/blog/nvidia-deepstream-7-0-milestone-release-for-next-gen-vision-ai-development/) supports BEVFusion for sensor fusion. 
+- **(2024/5)** BEVFusion is integrated into NVIDIA [DeepStream](https://developer.nvidia.com/blog/nvidia-deepstream-7-0-milestone-release-for-next-gen-vision-ai-development/) for sensor fusion!
 - **(2023/5)** BEVFusion is selected by NVIDIA as a [reference design](https://github.com/NVIDIA-AI-IOT/Lidar_AI_Solution/tree/master/CUDA-BEVFusion) to its customers in the automotive industry.
 - **(2023/4)** BEVFusion ranks first on [Argoverse](https://eval.ai/web/challenges/challenge-page/1710/overview) 3D object detection leaderboard among all solutions.
 - **(2023/1)** BEVFusion is accepted to ICRA 2023!
