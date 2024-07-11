@@ -7,7 +7,7 @@
 ## News
 
 - **(2024/5)** BEVFusion is integrated into NVIDIA [DeepStream](https://developer.nvidia.com/blog/nvidia-deepstream-7-0-milestone-release-for-next-gen-vision-ai-development/) for sensor fusion!
-- **(2023/5)** NVIDIA provides a [TensorRT deployment solution](https://github.com/NVIDIA-AI-IOT/Lidar_AI_Solution/tree/master/CUDA-BEVFusion) of BEVFusion, achieving 25 FPS on Jetson AGX Orin.
+- **(2023/5)** NVIDIA provides a [TensorRT deployment solution](https://github.com/NVIDIA-AI-IOT/Lidar_AI_Solution/tree/master/CUDA-BEVFusion) of BEVFusion, achieving 25 FPS on Jetson Orin.
 - **(2023/4)** BEVFusion ranks first on [Argoverse](https://eval.ai/web/challenges/challenge-page/1710/overview) 3D object detection leaderboard among all solutions.
 - **(2023/1)** BEVFusion is accepted to ICRA 2023!
 - **(2022/8)** BEVFusion ranks first on [Waymo](https://waymo.com/open/challenges/2020/3d-detection/) 3D object detection leaderboard among all solutions.
