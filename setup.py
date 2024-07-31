@@ -12,7 +12,7 @@ def make_cuda_ext(
     define_macros = []
     extra_compile_args = {"cxx": [] + extra_args}
 
-    if torch.cuda.is_available() or os.getenv("FORCE_CUDA", "0") == "1":
+    if (torch.cuda.is_available() and torch.version.cuda is not None) or os.getenv("FORCE_CUDA", "0") == "1":
         define_macros += [("WITH_CUDA", None)]
         extension = CUDAExtension
         extra_compile_args["nvcc"] = extra_args + [
@@ -23,6 +23,15 @@ def make_cuda_ext(
             "-gencode=arch=compute_75,code=sm_75",
             "-gencode=arch=compute_80,code=sm_80",
             "-gencode=arch=compute_86,code=sm_86",
+        ]
+        sources += sources_cuda
+    elif (torch.cuda.is_available() and torch.version.hip is not None) or os.getenv("FORCE_ROCM", "0") == 1:
+        define_macros += [("WITH_ROCM", None)]
+        extension = CUDAExtension
+        extra_compile_args["hipcc"] = extra_args + [
+            "-D__HIP_NO_HALF_OPERATORS__",
+            "-D__HIP_NO_HALF_CONVERSIONS__",
+            "-D__HIP_NO_HALF2_OPERATORS__",
         ]
         sources += sources_cuda
     else:
@@ -66,20 +75,20 @@ if __name__ == "__main__":
                 ],
                 sources=[
                     "src/all.cc",
-                    "src/reordering.cc",
+                    "src/reordering_cpu.cc",
                     "src/reordering_cuda.cu",
-                    "src/indice.cc",
+                    "src/indice_cpu.cc",
                     "src/indice_cuda.cu",
-                    "src/maxpool.cc",
+                    "src/maxpool_cpu.cc",
                     "src/maxpool_cuda.cu",
                 ],
-                extra_args=["-w", "-std=c++14"],
+                extra_args=["-w", "-std=c++17"],
             ),
             make_cuda_ext(
                 name="bev_pool_ext",
                 module="mmdet3d.ops.bev_pool",
                 sources=[
-                    "src/bev_pool.cpp",
+                    "src/bev_pool_cpu.cpp",
                     "src/bev_pool_cuda.cu",
                 ],
             ),
@@ -117,13 +126,13 @@ if __name__ == "__main__":
             make_cuda_ext(
                 name="ball_query_ext",
                 module="mmdet3d.ops.ball_query",
-                sources=["src/ball_query.cpp"],
+                sources=["src/ball_query_cpu.cpp"],
                 sources_cuda=["src/ball_query_cuda.cu"],
             ),
             make_cuda_ext(
                 name="knn_ext",
                 module="mmdet3d.ops.knn",
-                sources=["src/knn.cpp"],
+                sources=["src/knn_cpu.cpp"],
                 sources_cuda=["src/knn_cuda.cu"],
             ),
             make_cuda_ext(
@@ -135,7 +144,7 @@ if __name__ == "__main__":
             make_cuda_ext(
                 name="group_points_ext",
                 module="mmdet3d.ops.group_points",
-                sources=["src/group_points.cpp"],
+                sources=["src/group_points_cpu.cpp"],
                 sources_cuda=["src/group_points_cuda.cu"],
             ),
             make_cuda_ext(
@@ -147,13 +156,13 @@ if __name__ == "__main__":
             make_cuda_ext(
                 name="furthest_point_sample_ext",
                 module="mmdet3d.ops.furthest_point_sample",
-                sources=["src/furthest_point_sample.cpp"],
+                sources=["src/furthest_point_sample_cpu.cpp"],
                 sources_cuda=["src/furthest_point_sample_cuda.cu"],
             ),
             make_cuda_ext(
                 name="gather_points_ext",
                 module="mmdet3d.ops.gather_points",
-                sources=["src/gather_points.cpp"],
+                sources=["src/gather_points_cpu.cpp"],
                 sources_cuda=["src/gather_points_cuda.cu"],
             ),
         ],

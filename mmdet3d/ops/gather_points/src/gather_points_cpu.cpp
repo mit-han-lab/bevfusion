@@ -1,11 +1,9 @@
 #include <ATen/cuda/CUDAContext.h>
-#include <THC/THC.h>
 #include <torch/extension.h>
 #include <torch/serialize/tensor.h>
+#include <c10/cuda/CUDAStream.h>
 
 #include <vector>
-
-extern THCState *state;
 
 int gather_points_wrapper(int b, int c, int n, int npoints,
                           at::Tensor points_tensor, at::Tensor idx_tensor,
